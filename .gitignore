@@ -1,0 +1,5 @@
+# Archivos con credenciales reales - NO subir a git
+scripts/admin/
+scripts/profesor/
+salida-usuarios-keystone/credenciales.csv
+salida-usuarios-keystone/profesor/
