@@ -314,7 +314,7 @@ Openstack maneja luego más máquinas para provisionar los servicios: BBDD, VM, 
 
 Openshift:
  - Plano de control: 3 máquinas
- - Infraestructura: variable >2 máquinas
+ - Infraestructura: variable > 2 máquinas
    - Otros programas que monta Openshift
  - Openstack: Máquinas solo a nivel de Openstack (control-plane = componentes). En vuestro caso, éste está junto con el plano de control del openshift
  - Maquinas de computo
@@ -431,3 +431,19 @@ Hay gente que montó SO (o lo intentaron) cumpliendo co esos entandares... pero 
     - Lectura (r)
     - Escritura (w)
     - Ejecución (x) 
+
+
+
+Usuario: alumno1
+Dominio: dominio-alumno1                admin
+    ^
+    Proyecto: proyecto-alumno1          admin
+
+
+
+---
+
+Niveles de agrupamiento lógico dentro de un clsuetr de Openstack:
+
+- Dominio: Agrupamiento lógico de usuarios y proyectos. Es un ámbito de administración de identidades. Un usuario pertenece a un dominio, y un proyecto pertenece a un dominio. Un usuario puede tener acceso a varios proyectos, pero siempre dentro del mismo dominio.
+- Proyecto: Agrupamiento lógico de recursos. Es un ámbito de administración de recursos. Un proyecto puede tener recursos de cómputo, redes, almacenamiento, etc. Un proyecto puede tener usuarios asociados con diferentes roles.

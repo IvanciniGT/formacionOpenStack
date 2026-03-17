@@ -132,7 +132,7 @@ EOF
 }
 
 # Crear alumnos
-for i in $(seq 1 15); do
+for i in $(seq 10 15); do
   crear_usuario_con_dominio "alumno${i}"
 done
 
