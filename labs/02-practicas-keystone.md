@@ -653,12 +653,43 @@ recibirá errores 403 en todos los comandos que requieren permisos.
 Eso es porque el rol `ayudante-junior` existe como etiqueta, pero las **policies**
 de Keystone no saben qué acciones le corresponden. Un rol sin policy es decorativo.
 
+### La capa que falta: oslo.policy
+
+En OpenStack, cada servicio (Keystone, Nova, Glance…) tiene un motor de autorización
+llamado **oslo.policy**. Funciona así:
+
+```
+petición API
+     │
+     ▼
+¿Autenticación válida?  →  sí  →  ¿Policy permite esta acción con estos roles?
+                                          │                │
+                                        200 OK           403 Forbidden
+```
+
+Las reglas de policy se guardan en `/etc/keystone/policy.yaml`. La regla para
+`list_projects` en este entorno es:
+
+```
+"identity:list_projects": "(rule:admin_required) or
+                           (role:reader and system_scope:all) or
+                           (role:reader and domain_id:...)"
+```
+
+`ayudante-junior` no aparece en ninguna regla → el motor nunca lo activa → 403.
+
+> **Nota:** `member` y `reader` tampoco funcionan para operaciones de Identity. `member`
+> no aparece en ninguna regla de Keystone. `reader` requiere `system_scope:all`, que
+> los tokens de proyecto estándar no tienen. Ambos roles **sí** dan permisos en
+> servicios como Nova, Cinder o Glance — pero eso lo veremos en prácticas posteriores.
+
 ## Preguntas
 
 1. ¿Pepito puede autenticarse?
 2. ¿Puede listar proyectos o usuarios?
 3. ¿Qué diferencia habría si existiera una policy que dijera `ayudante-junior` puede hacer X?
 4. ¿En qué se diferencia esto de `member`, que sí tiene policies definidas?
+5. ¿Qué fichero habría que modificar en el servidor para dar permisos reales a `ayudante-junior`?
 
 ### Limpieza
 
@@ -845,18 +876,41 @@ rem Lista todas las asignaciones de rol del cloud (con nombres legibles).
 openstack role assignment list --names
 ```
 
+## Policies y autorización
+
+En OpenStack, tener un rol **no garantiza permisos**. Los permisos los define la
+`policy.yaml` de cada servicio a través del motor `oslo.policy`.
+
+```
+Autenticación (Keystone)  →  ¿usuario y contraseña correctos?  →  token
+Autorización  (oslo.policy) →  ¿la policy permite esta acción?    →  200 / 403
+```
+
+Roles que funcionan en operaciones de **Identity** (Keystone):
+
+| Rol | `project list` | `user list` | `user create` | `project create` |
+|-----|:--------------:|:-----------:|:-------------:|:----------------:|
+| `admin` (en dominio/proyecto) | ✅ | ✅ (solo su dominio) | ✅ | ✅ |
+| `reader` (con project scope) | ❌ 403 | ❌ 403 | ❌ 403 | ❌ 403 |
+| `member` | ❌ 403 | ❌ 403 | ❌ 403 | ❌ 403 |
+| rol custom sin policy | ❌ 403 | ❌ 403 | ❌ 403 | ❌ 403 |
+
+> `member` y `reader` **sí** dan permisos en Nova, Cinder, Glance, etc.
+> Pero en Keystone solo `admin` (legacy policy) o `reader` con system_scope tienen acceso.
+
 ---
 
 # 15. Cosas importantes que debes recordar
 
-* autenticación no es autorización
-* un usuario no es un permiso
+* **autenticación ≠ autorización**: que Keystone te dé token no significa que puedas hacer todo
 * un rol sin asignación no sirve de nada
+* un rol sin policy tampoco: existe como etiqueta, pero no abre puertas
 * el dominio es tu espacio aislado: lo que creas allí no interfiere con otros alumnos
 * el proyecto es el contexto operativo habitual dentro de un dominio
-* `admin` en tu dominio **conceptualmente** no significa admin global
-* **pero** según las políticas reales del entorno, podrías tener más visibilidad o permisos de los esperados
-* Keystone no es solo login: también es catálogo, contexto y autorización
+* `admin` en tu dominio con la policy legacy **sí da visibilidad global** (ves todos los proyectos del cloud), aunque no puedas administrar lo que no es tuyo
+* `member` y `reader` **no tienen permisos en Identity** (Keystone). Sí los tienen en Nova, Cinder, Glance, etc.
+* La regla `admin_required` en este entorno equivale simplemente a `role:admin` — sin restricción de scope
+* Keystone no es solo login: también es catálogo de servicios, gestión de dominios/proyectos/usuarios y motor de autorización
 
 ---
 

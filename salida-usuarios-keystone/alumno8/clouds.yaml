@@ -1,0 +1,11 @@
+clouds:
+  curso-openstack:
+    region_name: RegionOne
+    identity_api_version: 3
+    auth:
+      auth_url: https://keystone.ivanosuna.com/v3
+      username: alumno8
+      password: <Escribe aqui tu password>
+      project_name: proyecto-alumno8
+      user_domain_name: dominio-alumno8
+      project_domain_name: dominio-alumno8
