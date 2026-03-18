@@ -942,3 +942,56 @@ La idea de cierre puede expresarse así:
 > Una instancia útil en OpenStack no nace exclusivamente de Nova, sino de la colaboración entre identidad, imagen, red, cómputo, capacidad y, en muchos casos, almacenamiento.
 
 Si quieres, ahora te dejo el **Día 3 con el mismo estilo exacto**, para que todo el manual quede uniforme.
+
+
+---
+
+Tenemos varios Scopes en Opensstack:
+  Global/Sistema
+  Dominio
+  Proyecto
+Las variables de entorno con las que configuro el contexto son:
+ - Global
+        OS_SYSTEM_SCOPE=all
+ - Dominio
+        OS_DOMAIN_NAME=<MI-DOMINIO>
+ - Proyecto
+        OS_PROJECT_NAME=<MI-PROYECTO>
+        OS_PROJECT_DOMAIN_NAME=<MI-DOMINIO>
+Importante que cuando elijo un contexto, el resto de variables estén NO ASIGNADAS.
+
+Cuando nos conectamos, mi usuario puede tener distintos roles en base al contexto:
+
+  - Role: Admin       Contexto: Dominio
+  - Role: Admin       Contexto: Proyecto
+
+  Esto justo es un sinsentido. El role admin SOLO TIENE SENTIDO tenerlo asignado a nivel de SISTEMA.
+  Porque realmente Keystone no verifica el contexto a la hora de aplicar el ROLE.
+
+  Llevaroslo a un caso con más sentido:
+  - Soy Menchu... y me ponen como "member" en el proyecto A
+                    me ponen como "reader" en el proyecto B
+
+
+  Cuando entro, que role tengo? En el token irá una lista de roles... condicionada al conexto con el me conecte:
+    - Si me conecto con el contexto de proyecto A, en el token aparecerá el role "member" y no aparecerá el role "reader"
+    - Si me conecto con el contexto de proyecto B, en el token aparecerá el role "reader" y no aparecerá el role "member"
+
+  Eso determina lo que podrá hacer, en base a los permisos (politicas)
+
+Luego a este se suma otra cosa... Más espinosa...
+Soy otra vez el usuario "profesor" 
+  - me asignan el role "admin" a nivel de proyecto... 
+  - el role "admin" a nivel de dominio... 
+
+  Puedo crear un dominio?
+  - En contexto dominio tengo role Admin, con lo que podría hacerlo (a priori)
+      Pero al limitar el contexto a un dominio, algunas operaciones Keystone solo me las deja hacer a nivel de ese dominio. 
+  - En contexto proyecto tengo role Admin, con lo que también podría hacerlo (a priori)
+      Al conectarme a nivel de proyecto, no tengo establecido un dominio... aunque el proyecto pertenece a un dominio. Y Aqui si me deja hacer operaciones a nivel los dominios que quiera... porque no hay reglas que o impidan.
+  - En contexto sistema no tengo role admin y no me dejará
+
+Lo normal es que el usuario admin solo tenga el role admin a nivel de sistema.
+Y me conecto con contexto de sistema.
+Gestiono los dominios que quiero. YYa que no tengo un contexto a nivel de dominio.
+

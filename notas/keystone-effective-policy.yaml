@@ -87,7 +87,7 @@
 # ---------------------------------------------------------
 
 "identity:get_domain": "rule:admin_required or (role:reader and system_scope:all) or token.domain.id:%(target.domain.id)s or token.project.domain.id:%(target.domain.id)s"
-"identity:list_domains": "rule:admin_required or (role:reader and system_scope:all) or (role:reader and domain_id:%(target.domain.id)s)"
+"identity:list_domains": "(rule:admin_required) or (role:reader and system_scope:all) or (role:reader and domain_id:%(target.domain.id)s)"
 "identity:create_domain": "rule:admin_required"
 "identity:update_domain": "rule:admin_required"
 "identity:delete_domain": "rule:admin_required"

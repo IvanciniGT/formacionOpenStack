@@ -132,6 +132,7 @@ Al año firma acuerdos con:
         -------------------------------------
             Hierro
 
+
 Los contenedores los creamos desde Imágenes de contenedor (similar a una ISO para una VM).
 Una imagen de contenedor es un triste archivo comprimido (tar) que tiene dentro:
 - sistema de archivos compatible con POSIX = Encontramos las 4 carpetas típicas de Linux/Unix:
@@ -232,6 +233,7 @@ Redhat    -> kubernetes
             Kubernetes              ^
                 v
             Openstack     -----> Kubernetes 
+
 
 Hay varias formas de instalar este cotarro. La instalación de un cluster de openstack ES COMPLEJA! a rabiar!
 
