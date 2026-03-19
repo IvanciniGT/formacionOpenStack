@@ -200,7 +200,7 @@ Con ese usuario crear un proyecto
         proyecto-alumno1-cliente
 
 Usuario: Operador: alumno1-operador
-    Role: reader en el proyecto creado por el manager
+    Role: member en el proyecto creado por el manager
 
 Conectarnos con ese usuario operador, y listar los proyectos a los que tiene acceso.
 
