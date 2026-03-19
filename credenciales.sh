@@ -13,5 +13,4 @@ export OS_USER_DOMAIN_NAME=dominio-profesor
 export OS_PROJECT_NAME=proyecto-profesor
 export OS_PROJECT_DOMAIN_NAME=dominio-profesor
 unset  OS_DOMAIN_NAME
-
 #KeyStone, si no pongo contexto, trabaja por defecto con mi dominio.

@@ -1,0 +1,118 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Crea un dominio cliente, un usuario manager con rol manager en el dominio,
+  un proyecto dentro de ese dominio y un usuario operador con rol reader
+  sobre ese proyecto.
+
+parameters:
+  domain_name:
+    type: string
+    default: dominio-alumno1-cliente
+
+  project_name:
+    type: string
+    default: proyecto-alumno1-cliente
+
+  manager_user_name:
+    type: string
+    default: alumno1-manager
+
+  manager_password:
+    type: string
+    default: Pa$$w0rd
+    hidden: true
+
+  operator_user_name:
+    type: string
+    default: alumno1-operador
+
+  operator_password:
+    type: string
+    default: Pa$$w0rd
+    hidden: true
+
+resources:
+ # Sease un dominio llamado domain_name, con descripción "Dominio cliente de alumno1" y habilitado.
+ # El día de mañana, le diré HEAT lo que quiero que haga con ese dominio: QUE LO BORRE, QUE SE ASEGURE DE QUE EXISTE DE ESA FORMA.
+ # Felipe, En mi Openstack quiero "esto" y es tu responsabildiad conseguirlo.
+ # Felipe, En mi Openstack no quiero "esto" y es tu responsabildiad conseguirlo.
+ # Felipe, Debajo de la ventana quiero una silla, y es tu responsabilidad conseguirlo.
+
+# openstack stack create -t script.yaml -e script_env.yaml GRUPO_RECURSOS_1
+#  ^^ Y este comando me asegurará que todo quede creado como le declaro en el fichero
+#     Si está creado de otra forma, tendré que editarlo...
+#     Si está creado en parte... tendrá que crear lo que sea necesario
+#     Si hay parte creado con datos disntos y parte no... ES SU PUÑETERO PROBLEMA
+# openstack stack delete GRUPO_RECURSOS_1
+  cliente_domain:
+    type:                 OS::Keystone::Domain
+    properties:
+      name: 
+        get_param:        domain_name 
+      description:        Dominio cliente de alumno1
+      enabled:            true
+
+      # mkdir ventana    # Orden: Make Directory ventana
+      # rmdir ventana    # Orden: Remove Directory ventana
+      # En yaml, al usar lenguaje declarativo lo unico que declaro es "ventana"
+      # A la hora de eplicar la plantilla yaml, ya digo que hacer con el "esto"
+      #. Apply "ventana"  # Orden: Apply "ventana"
+      #. Delete "ventana" # Orden: Delete "ventana"
+      # La responsabilidad de planificar las tareas necesarias para conseguir eso las delego.
+
+  cliente_project:
+    type: OS::Keystone::Project
+    properties:
+      name: { get_param: project_name }
+      description: Proyecto del cliente alumno1
+      domain: { get_resource: cliente_domain }
+      enabled: true
+
+  manager_user:
+    type: OS::Keystone::User
+    properties:
+      name: { get_param: manager_user_name }
+      password: { get_param: manager_password }
+      domain: { get_resource: cliente_domain }
+      enabled: true
+
+  operator_user:
+    type: OS::Keystone::User
+    properties:
+      name: { get_param: operator_user_name }
+      password: { get_param: operator_password }
+      domain: { get_resource: cliente_domain }
+      enabled: true
+
+  manager_domain_assignment:
+    type: OS::Keystone::UserRoleAssignment
+    properties:
+      user: { get_resource: manager_user }
+      roles:
+        - role: manager
+          domain: { get_resource: cliente_domain }
+
+  operator_project_assignment:
+    type: OS::Keystone::UserRoleAssignment
+    properties:
+      user: { get_resource: operator_user }
+      roles:
+        - role: reader
+          project: { get_resource: cliente_project }
+
+outputs:
+  domain_id:
+    value: 
+      get_resource: cliente_domain 
+
+  project_id:
+    value: 
+      get_resource: cliente_project
+
+  manager_user_id:
+    value: 
+      get_resource: manager_user
+
+  operator_user_id:
+    value: { get_resource: operator_user }

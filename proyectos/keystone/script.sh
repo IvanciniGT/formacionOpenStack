@@ -99,7 +99,7 @@ crear_proyecto() {
     openstack token issue
 
     echo "√ Crear dominio para el cliente"
-    openstack domain create "$DOMINIO_CLIENTE" \
+    openstack domain create "$DOMINIO_CLIENTE"  º
         --description "Dominio del cliente ${NOMBRE_ADMINISTRADOR}"
     openstack domain show "$DOMINIO_CLIENTE"
 
@@ -172,7 +172,7 @@ crear_proyecto() {
     openstack project show "$PROYECTO_CLIENTE" --domain "$DOMINIO_CLIENTE" || true
 
     echo "  [200 OK] project list --my-projects"
-    echo "    GET /v3/auth/projects"
+    echo "    GET /v3/user/{user_id}/projects"
     echo "    policy: identity:list_projects_for_user"
     echo "    regla:  \"\"  (vacía = sin restricción) → 200"
     openstack project list --my-projects
@@ -207,7 +207,7 @@ crear_proyecto() {
     openstack project show "$PROYECTO_CLIENTE" --domain "$DOMINIO_CLIENTE" || true
 
     echo "  [200 OK] project list --my-projects"
-    echo "    GET /v3/auth/projects"
+    echo "    GET /v3/user/{user_id}/projects"
     echo "    policy: identity:list_projects_for_user"
     echo "    regla:  \"\"  (vacía = sin restricción) → 200"
     openstack project list --my-projects
@@ -245,10 +245,18 @@ borrar_todo() {
     openstack project delete "$PROYECTO_CLIENTE" --domain "$DOMINIO_CLIENTE" \
         && echo "  Borrado" || echo "  Hubo un problema borrando $PROYECTO_CLIENTE"
 
+    # Felipe: Desactiva el dominio para poder borrarlo
+    # Y si el dominio ya esta desactivado? ERROR.
+    # Y Entonces tengo que controlar ese error.. para que en ese caso siga!
+    # Si te da error: CONTINUA:         set -euo pipefail
+    # Felipe, si no hay sillas goto ikea!
+
     echo "√ Deshabilitando dominio del cliente..."
     openstack domain set "$DOMINIO_CLIENTE" --disable \
         && echo "  Deshabilitado" || echo "  Hubo un problema deshabilitando $DOMINIO_CLIENTE"
 
+    # Felipe: Borra el dominio
+    # Felipe, pon una silla debajo de la ventana.
     echo "√ Borrando dominio del cliente..."
     openstack domain delete "$DOMINIO_CLIENTE" \
         && echo "  Borrado" || echo "  Hubo un problema borrando $DOMINIO_CLIENTE"

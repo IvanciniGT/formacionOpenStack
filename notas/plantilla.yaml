@@ -1,0 +1,160 @@
+
+# Puedo poner comentarios. Aleluya! Cosa que por ejemplo en JSON no está permitida
+# En un fichero YAML puedo tener muchos documentos YAML.
+# En JSON, un fichero JSON = un documento JSON.
+# En XML, un fichero XML = un documento XML.
+# En un fichero .properties, un fichero .properties = un documento .properties.
+# En YAML, un fichero YAML = 1 o más documentos YAML.
+# Cada documento empieza con ---, menos el primero que se le pone eso.
+
+---
+# Un documento YAML Es un NODO.
+# Y hay 2 tipos: Escalares y De colección
+# - Escalares: Valores simples: números, cadenas de texto, booleanos, nulos.
+# - De colección: Listas ordenadas y Mapas desordenados.
+
+---
+# Números:
+4
+---
+-17.7
+---
+# Booleanos: 
+true # True TRUE
+---
+false # False FALSE
+---
+# Textos: Lo más complejo de YAML
+Hola," 
+
+soy 'un 
+texto \\\n\ten #YAML
+---
+"Hola,\" 
+
+soy 'un 
+texto \\\n\ten #YAML"
+# El caracter de escape \ solo sirve entre comillas dobles.
+# Aqui puedo usar: \n \t \\
+---
+'Hola," 
+
+soy ''un 
+texto \\\n\ten #YAML'
+
+# RESUMEN:
+# - La sintaxis preferida para texto en YAML ES SIN COMILLAS.
+# - Pondré comillas si tengo algún carácter raro que me joda: #
+# - Esas sintaxis las reservo para textos de 1 linea.
+
+---
+
+# Hay otras 2 sintaxis más para textos:
+
+# Literal
+|2+
+    Empiezo a escribir mi texto
+  Que puede tener varias lineas
+
+  Y caracteres raros \ " # lo que sea :
+  NO IMPORTA
+
+
+---
+# Folded
+> 
+  openstack domain create 
+    --description "Domain for OpenStack services" 
+    default > salida.txt
+
+---
+
+# Listas ordenadas: Guion delante de cada item de la lista.. 
+# Después del sguion, al menos un espacio en blanco.
+# Puedo tener datos de disnto tipo en la lista
+# Pensad en una estructura jerárquica.. como carpetas en windows.
+- Item 1
+-               2
+-     true
+-
+  - subitem 1
+  - subitem 2
+  - 3
+-
+  - subitem 1
+  - subitem 2
+  - 3
+    # Aquí al menos un espacio sangrado con respecto al anterior nivel.
+    # Lo único que exige YAML es que el sangrado sea uniforme en cada nivel
+# Hay una sintaxis alternativa:
+---
+[ Item1, 2, true, [subitem1, subitem2, 3], [subitem1, subitem2, 3] ] 
+---
+[item1, 2, true] # Esta sintaxis no se usa. No está recomendada.
+# Está solo por 2 motivos:
+# - Para poder poner listas vacias
+---
+[]
+--- 
+# Para compatibilidad con JSON:
+[item1, 2, TRUE]
+# ["item1", 2, true] # Esto es JSON... y también es YAML.
+# Cualquier documento JSON, puede ser tratado como YAML (casi casi...)
+---
+- item 1
+- 2
+- true
+---
+# Diccionarios | Mapas desordenados: Clave: Valor | Arrays Asociativos 
+# Pares clave / valor
+clave1: valor1
+clave2: 33
+clave3: true
+clave4:
+              - item1
+              - item2
+clave5:
+  subclave1:            valor1
+  subclave2: valor2
+# ESTE ES EL TIPO DE DOCUMENTO MAS HABITUAL EN YAML.
+---
+# Sintaxis alternativa:
+{ clave1: valor1, clave2: 33, clave3: true, clave4: [item1, item2], clave5: { subclave1: valor1, subclave2: valor2 } }
+# Esa sintaxis no se recomienda, pero es compatible con JSON.
+---
+# Si hace falta para un caso de uso: Mapa vacío:
+{}  
+---
+# Los mapas son desordenados:
+clave1: valor1
+clave2: valor2
+clave3: valor3
+---
+clave3: valor3
+clave1: valor1
+clave2: valor2
+# Se consideran identicos.
+---
+# Observaciones
+# Cuando uso estos archivos es MUY IMPORTANTE usan 
+# un buen editor de texto.
+# Los espacios y las tabulaciones no son lo mismo... aunque visualmente puedan parecerlo.
+# Quizás use un editor que me represente los tabs como 4 espacios...
+# Y tengo 2 lineas, una con un tab y otra con 4 espacios... visualmente parecen iguales, pero no lo son.
+# YAML ME DA ERROR. No me da error por usar tabs. Sino porque esas 2 cosas tendrían sangrados diferentes.
+# Un buen edito, reemplaza los tabs con espacios, para evitar problemas.
+---
+# Con el bloc de notas, el vi... la lio al segundo
+---
+# YAML llegha hasta aquí.  Nos da una sinatxis BASICA.
+# Cada programa que usa YAML define lo que se llama un ESQUEMA.
+# Ese esquema define la estructura que debe tener un documento YAML para ese programa concreto.
+# Por ejemplo, el archivo clouds.yaml de OpenStack, tiene un esquema concreto:
+clouds:
+  mi_nube:
+    auth:
+      auth_url: http://localhost:5000/v3
+      username: admin
+      password: admin
+      project_name: admin
+---
