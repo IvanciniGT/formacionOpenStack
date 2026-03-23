@@ -35,36 +35,28 @@ Eso significa que tu dominio es tu reino: puedes gestionarlo libremente sin pisa
 > **Nota importante para Windows:** en `cmd.exe` los comandos multilínea con `\` no funcionan.
 > Escribe siempre los comandos en una sola línea o copia directamente desde aquí.
 
-## 1.1 Activar el entorno virtual (Windows)
-
-Si lo instalaste en Windows con entorno virtual:
+## 1.1 Activar entorno y cargar credenciales
 
 ```bat
 rem Activa el entorno virtual donde instalaste python-openstackclient.
-rem Mientras esté activo, el comando "openstack" estará disponible en este terminal.
 %USERPROFILE%\openstack-client\Scripts\activate
+
+rem Configura tus credenciales. Sustituye <tu_password> por tu contraseña.
+set OS_AUTH_URL=https://keystone.ivanosuna.com/v3
+set OS_IDENTITY_API_VERSION=3
+set OS_USERNAME=alumno1
+set OS_PASSWORD=<tu_password>
+set OS_PROJECT_NAME=proyecto-alumno1
+set OS_USER_DOMAIN_NAME=dominio-alumno1
+set OS_PROJECT_DOMAIN_NAME=dominio-alumno1
 ```
 
-## 1.2 Cargar tu contexto
-
-Antes de poder usar la CLI tienes que decirle a qué cloud conectarte y con qué usuario.
-Eso lo hace el archivo `openrc.cmd`: define variables de entorno que el cliente lee automáticamente.
-
-Ejemplo para `alumno1`:
-
-```bat
-rem Carga las variables de entorno con tus credenciales.
-rem "call" es necesario para que las variables queden activas en este terminal.
-rem Sin "call", el fichero se ejecutaría en un subproceso y las variables se perderían.
-call alumno1-openrc.cmd
-```
-
-## 1.3 Comprobar autenticación
+## 1.2 Comprobar autenticación
 
 ```bat
 rem Solicita a Keystone un token de acceso con tus credenciales actuales.
 rem Si devuelve datos (id, expires, project_id...) es que la autenticación funciona.
-rem Si devuelve error 401, tus credenciales son incorrectas o no has cargado el openrc.
+rem Si devuelve error 401, tus credenciales son incorrectas.
 openstack token issue
 ```
 

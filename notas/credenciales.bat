@@ -6,7 +6,12 @@ set OS_IDENTITY_API_VERSION=3
 rem Datos identificativos del usuario (3)
 
 rem Nombre del usuario
-set OS_USERNAME=profesor
+rem para crear:
+set OS_USERNAME=alumno2-operador
+
+rem para verificar:
+rem OS_USERNAME=alumno2-monitoring
+
 rem Dominio donde existe el usuario
 set OS_USER_DOMAIN_NAME=dominio-profesor 
 rem Contraseña del usuario

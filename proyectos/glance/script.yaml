@@ -1,0 +1,76 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Sube una imagen cirros a Glance usando web-download desde la URL oficial.
+  Define nombre, formato, visibilidad, restricciones de disco/ram,
+  etiquetas y propiedades personalizadas.
+
+# Uso:
+#   openstack stack create -t script.yaml glance-stack
+#   openstack stack delete glance-stack
+#
+# Con parametros personalizados:
+#   openstack stack create -t script.yaml \
+#     --parameter image_name=mi-cirros-custom \
+#     glance-stack
+
+parameters:
+
+  image_name:
+    type: string
+    default: mi-cirros
+    description: Nombre de la imagen en Glance
+
+  image_url:
+    type: string
+    default: http://download.cirros-cloud.net/0.6.2/cirros-0.6.2-x86_64-disk.img
+    description: URL de descarga de la imagen (web-download)
+
+  image_visibility:
+    type: string
+    default: private
+    description: Visibilidad de la imagen (private, shared, community, public)
+    constraints:
+      - allowed_values: [private, shared, community, public]
+
+resources:
+
+  # Heat descarga la imagen desde image_url usando el mecanismo web-download
+  # de Glance (equivalente a: openstack image import --method web-download ...)
+  cirros_image:
+    type: OS::Glance::Image
+    properties:
+      name:             { get_param: image_name }
+      disk_format:      qcow2
+      container_format: bare
+      location:         { get_param: image_url }
+      visibility:       { get_param: image_visibility }
+      min_disk:         1
+      min_ram:          64
+      protected:        false
+      tags:
+        - lab
+        - cirros
+      extra_properties:
+        os_distro:    cirros
+        os_version:   "0.6.2"
+        arquitectura: x86_64
+        uso:          lab
+
+outputs:
+
+  image_id:
+    description: ID de la imagen creada
+    value: { get_resource: cirros_image }
+
+  image_name:
+    description: Nombre de la imagen
+    value: { get_attr: [cirros_image, name] }
+
+  image_status:
+    description: Estado de la imagen (active, queued, ...)
+    value: { get_attr: [cirros_image, status] }
+
+  image_size:
+    description: Tamanio en bytes
+    value: { get_attr: [cirros_image, size] }

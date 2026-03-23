@@ -1,0 +1,76 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Crea un contenedor Swift con metadatos personalizados.
+  Heat gestiona el ciclo de vida del contenedor (create/delete) de forma
+  declarativa. La subida de objetos individuales no es gestionable via Heat
+  (no existe OS::Swift::Object), eso se hace via CLI o scripts.
+
+# Uso:
+#   openstack stack create -t script.yaml swift-stack
+#   openstack stack delete swift-stack
+#
+# Con parametros personalizados:
+#   openstack stack create -t script.yaml \
+#     --parameter container_name=mis-documentos-custom \
+#     swift-stack
+
+parameters:
+
+  container_name:
+    type: string
+    default: mis-documentos
+    description: Nombre del contenedor Swift
+
+  container_metadata_proyecto:
+    type: string
+    default: practicas
+    description: Valor de la propiedad 'proyecto' del contenedor
+
+  container_metadata_entorno:
+    type: string
+    default: lab
+    description: Valor de la propiedad 'entorno' del contenedor
+
+resources:
+
+  documentos_container:
+    type: OS::Swift::Container
+    properties:
+      name: { get_param: container_name }
+      # Metadatos del contenedor (equivalente a: openstack container set --property ...)
+      metadata:
+        proyecto: { get_param: container_metadata_proyecto }
+        entorno:  { get_param: container_metadata_entorno }
+
+  # Contenedor adicional de backups (sin metadatos extra)
+  backups_container:
+    type: OS::Swift::Container
+    properties:
+      name:
+        str_replace:
+          template: CONTAINER-backups
+          params:
+            CONTAINER: { get_param: container_name }
+
+outputs:
+
+  container_name:
+    description: Nombre del contenedor principal
+    value: { get_resource: documentos_container }
+
+  container_bytes_used:
+    description: Bytes usados en el contenedor
+    value: { get_attr: [documentos_container, bytes_used] }
+
+  container_object_count:
+    description: Numero de objetos en el contenedor
+    value: { get_attr: [documentos_container, object_count] }
+
+  container_url:
+    description: URL publica del contenedor
+    value: { get_attr: [documentos_container, WebsiteURL] }
+
+  backups_container_name:
+    description: Nombre del contenedor de backups
+    value: { get_resource: backups_container }

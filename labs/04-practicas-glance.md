@@ -51,11 +51,19 @@ Cada alumno tiene:
 ## 1.1 Activar entorno y cargar credenciales
 
 ```bat
-rem Activa el entorno virtual.
+rem Activa el entorno virtual donde instalaste python-openstackclient.
 %USERPROFILE%\openstack-client\Scripts\activate
 
-rem Carga tus credenciales.
-call alumno1-openrc.cmd
+rem Configura tus credenciales. Sustituye <tu_password> por tu contraseña.
+set OS_AUTH_URL=https://keystone.ivanosuna.com/v3
+set OS_IDENTITY_API_VERSION=3
+set OS_USERNAME=alumno1
+set OS_PASSWORD=<tu_password>
+set OS_PROJECT_NAME=proyecto-alumno1
+set OS_USER_DOMAIN_NAME=dominio-alumno1
+set OS_PROJECT_DOMAIN_NAME=dominio-alumno1
+
+openstack token issue
 ```
 
 ## 1.2 Comprobar que Glance está disponible

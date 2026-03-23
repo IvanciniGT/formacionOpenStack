@@ -99,7 +99,7 @@ crear_proyecto() {
     openstack token issue
 
     echo "√ Crear dominio para el cliente"
-    openstack domain create "$DOMINIO_CLIENTE"  º
+    openstack domain create "$DOMINIO_CLIENTE" \
         --description "Dominio del cliente ${NOMBRE_ADMINISTRADOR}"
     openstack domain show "$DOMINIO_CLIENTE"
 

@@ -7,18 +7,24 @@
 
 ## 1. Configurar el entorno
 
-### Cargar el openrc y verificar variables
+### Cargar credenciales
 
-```bash
-source alumno1-openrc.sh
-set | grep ^OS_
+```bat
+set OS_AUTH_URL=https://keystone.ivanosuna.com/v3
+set OS_IDENTITY_API_VERSION=3
+set OS_USERNAME=alumno1
+set OS_PASSWORD=<tu_password>
+set OS_PROJECT_NAME=proyecto-alumno1
+set OS_USER_DOMAIN_NAME=dominio-alumno1
+set OS_PROJECT_DOMAIN_NAME=dominio-alumno1
 ```
 
-**Salida:**
+Para verificar que están cargadas, ejecuta `set OS_`:
+
 ```
 OS_AUTH_URL=https://keystone.ivanosuna.com/v3
 OS_IDENTITY_API_VERSION=3
-OS_PASSWORD=<AQUI_TU_PASSWORD>
+OS_PASSWORD=<tu_password>
 OS_PROJECT_DOMAIN_NAME=dominio-alumno1
 OS_PROJECT_NAME=proyecto-alumno1
 OS_USERNAME=alumno1
@@ -26,7 +32,7 @@ OS_USER_DOMAIN_NAME=dominio-alumno1
 ```
 
 > **Nota:** fíjate que no hay `OS_REGION_NAME` definido. El cliente usa `RegionOne` por defecto
-> cuando no está definida. En Windows la variable sería `set OS_` (sin el signo igual) para listar.
+> cuando no está definida.
 
 ---
 

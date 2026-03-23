@@ -7,13 +7,17 @@
 
 ## 1. Preparación del entorno
 
-### Cargar el openrc
+### Cargar credenciales
 
 ```bat
-call alumno1-openrc.cmd
+set OS_AUTH_URL=https://keystone.ivanosuna.com/v3
+set OS_IDENTITY_API_VERSION=3
+set OS_USERNAME=alumno1
+set OS_PASSWORD=<tu_password>
+set OS_PROJECT_NAME=proyecto-alumno1
+set OS_USER_DOMAIN_NAME=dominio-alumno1
+set OS_PROJECT_DOMAIN_NAME=dominio-alumno1
 ```
-
-> En Linux/macOS el equivalente es `source alumno1-openrc.sh`
 
 ### Comprobar autenticación
 
@@ -907,7 +911,12 @@ proyecto-alumno1
 ## 13. Práctica 10 — Limpieza general
 
 ```bat
-call alumno1-openrc.cmd
+rem Vuelve al contexto de alumno1 antes de limpiar.
+set OS_USERNAME=alumno1
+set OS_PASSWORD=<tu_password>
+set OS_PROJECT_NAME=proyecto-alumno1
+set OS_USER_DOMAIN_NAME=dominio-alumno1
+set OS_PROJECT_DOMAIN_NAME=dominio-alumno1
 openstack user delete pancracio --domain dominio-alumno1
 openstack project delete operacion-croqueta --domain dominio-alumno1
 ```

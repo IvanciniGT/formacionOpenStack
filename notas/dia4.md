@@ -205,7 +205,22 @@ Crear un contenedor Swift:                      alumnoX-operador
 Subir un documento de texto a ese contenedor:   alumnoX-operador
 Ponerle alguna etiqueta: tipo: documento
 
-Acceder con el usuario reader: alumnoX-monitoring
+alumno -> proyecto-alumno
+alumnoX-operador -> proyecto-alumno-cliente
+Acceder con el usuario reader: alumnoX-monitoring -> proyecto-alumno-cliente
 
 Ver que somos capaces de ver la imagen de glance
 Ver que somos capaces de ver el contenedor y el documento de texto en swift
+
+
+---
+
+
+Usuarios
+                        dominio                         proyecto                        roles
+alumno2                 dominio-alumno2                 proyecto-alumno2                admin           < VERIFICAR
+alumno2-manager         dominio-alumno2-cliente         proyecto-alumno2-cliente        manager         < VERIFICAR
+alumno2-operador        dominio-alumno2-cliente         proyecto-alumno2-cliente        member          < CREAR
+alumno2-monitoring      dominio-alumno2-cliente         proyecto-alumno2-cliente        reader          < VERIFICAR
+
+
