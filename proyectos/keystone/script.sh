@@ -100,18 +100,18 @@ crear_proyecto() {
 
     echo "√ Crear dominio para el cliente"
     openstack domain create "$DOMINIO_CLIENTE" \
-        --description "Dominio del cliente ${NOMBRE_ADMINISTRADOR}"
+        --description "Dominio del cliente ${NOMBRE_ADMINISTRADOR}" || echo "  El dominio $DOMINIO_CLIENTE ya existe, continuando..."
     openstack domain show "$DOMINIO_CLIENTE"
 
     echo "√ Crear usuario manager"
     openstack user create "$NOMBRE_MANAGER" \
-        --password "$CONTRASENA_MANAGER" --domain "$DOMINIO_CLIENTE"
+        --password "$CONTRASENA_MANAGER" --domain "$DOMINIO_CLIENTE" || echo "  El usuario $NOMBRE_MANAGER ya existe, continuando..."
     openstack user show "$NOMBRE_MANAGER" --domain "$DOMINIO_CLIENTE"
 
     echo "√ Asignar rol manager al usuario manager en el dominio del cliente"
     openstack role add manager \
         --user "$NOMBRE_MANAGER" --user-domain "$DOMINIO_CLIENTE" \
-        --domain "$DOMINIO_CLIENTE"
+        --domain "$DOMINIO_CLIENTE" || echo "  El rol manager ya está asignado a $NOMBRE_MANAGER en el dominio $DOMINIO_CLIENTE, continuando..."
 
     echo "√ Cambiar a usuario manager"
     conectar_como "$NOMBRE_MANAGER" "$CONTRASENA_MANAGER" "$DOMINIO_CLIENTE"
@@ -123,12 +123,12 @@ crear_proyecto() {
     echo "√ Crear proyecto para el cliente"
     openstack project create "$PROYECTO_CLIENTE" \
         --domain "$DOMINIO_CLIENTE" \
-        --description "Proyecto del cliente ${NOMBRE_ADMINISTRADOR}"
+        --description "Proyecto del cliente ${NOMBRE_ADMINISTRADOR}" || echo "  El proyecto $PROYECTO_CLIENTE ya existe, continuando..."
     openstack project show "$PROYECTO_CLIENTE" --domain "$DOMINIO_CLIENTE"
 
     echo "√ Crear usuario operador"
     openstack user create "$NOMBRE_OPERADOR" \
-        --password "$CONTRASENA_OPERADOR" --domain "$DOMINIO_CLIENTE"
+        --password "$CONTRASENA_OPERADOR" --domain "$DOMINIO_CLIENTE" || echo "  El usuario $NOMBRE_OPERADOR ya existe, continuando..."
     openstack user show "$NOMBRE_OPERADOR" --domain "$DOMINIO_CLIENTE"
 
     echo "√ Asignar rol member al usuario operador en el proyecto del cliente"
@@ -138,23 +138,23 @@ crear_proyecto() {
 
     echo "√ Crear usuario monitoring"
     openstack user create "$NOMBRE_MONITORING" \
-        --password "$CONTRASENA_MONITORING" --domain "$DOMINIO_CLIENTE"
+        --password "$CONTRASENA_MONITORING" --domain "$DOMINIO_CLIENTE" || echo "  El usuario $NOMBRE_MONITORING ya existe, continuando..."
     openstack user show "$NOMBRE_MONITORING" --domain "$DOMINIO_CLIENTE"
 
     echo "√ Asignar rol reader al usuario monitoring en el proyecto del cliente"
     openstack role add reader \
         --user "$NOMBRE_MONITORING" --user-domain "$DOMINIO_CLIENTE" \
-        --project "$PROYECTO_CLIENTE" --project-domain "$DOMINIO_CLIENTE"
+        --project "$PROYECTO_CLIENTE" --project-domain "$DOMINIO_CLIENTE" || echo "  El rol reader ya está asignado a $NOMBRE_MONITORING en el proyecto $PROYECTO_CLIENTE, continuando..."
 
     echo "√ Verificar asignaciones de rol"
     openstack role assignment list \
         --project "$PROYECTO_CLIENTE" --project-domain "$DOMINIO_CLIENTE" \
-        --names
+        --names || echo "  No se pudieron listar las asignaciones de rol, continuando..."
 
     echo "√ Cambiar a usuario operador (member)"
     conectar_como "$NOMBRE_OPERADOR" "$CONTRASENA_OPERADOR" \
         "$DOMINIO_CLIENTE" "$PROYECTO_CLIENTE" "$DOMINIO_CLIENTE"
-    openstack token issue
+    openstack token issue 
 
     # -------------------------------------------------------
     # DEMO policies Keystone con rol member
