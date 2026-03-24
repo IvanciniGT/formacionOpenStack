@@ -385,5 +385,3 @@ Usuario: manager, operator, monitoring
         Las 2 las pinchamos.. pero tenemos solo un router.
 
 En todo lo posible trabajamos con el usuario operator.
-
-Lo ideal sería tener luego un DNS (Designate)

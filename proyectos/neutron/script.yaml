@@ -1,0 +1,268 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Crea la topologia de red Neutron para el lab de NGINX + MariaDB:
+    - Red interna con dos subnets (con y sin DHCP)
+    - Puerto con IP fija para MariaDB
+    - Router con gateway a la red external
+    - Security groups: sg-nginx (80/443/22/icmp) y sg-mariadb (3306/22/icmp desde red interna)
+    - Floating IP para NGINX
+
+# Uso:
+#   openstack stack create -t script.yaml --parameter nombre=profesor neutron-stack
+#   openstack stack delete neutron-stack
+#
+# Con parametros personalizados:
+#   openstack stack create -t script.yaml \
+#     --parameter nombre=alumno1 \
+#     --parameter cidr_1=10.1.0.0/24 \
+#     --parameter cidr_2=10.2.0.0/24 \
+#     neutron-stack
+
+parameters:
+
+  nombre:
+    type: string
+    default: profesor
+    description: Sufijo para nombrar los recursos (profesor, alumno1, ...)
+
+  cidr_1:
+    type: string
+    default: 10.1.0.0/24
+    description: CIDR de la subnet-1 (NGINX, con DHCP)
+
+  gateway_1:
+    type: string
+    default: 10.1.0.1
+    description: Gateway de la subnet-1
+
+  cidr_2:
+    type: string
+    default: 10.2.0.0/24
+    description: CIDR de la subnet-2 (MariaDB, sin DHCP)
+
+  gateway_2:
+    type: string
+    default: 10.2.0.1
+    description: Gateway de la subnet-2
+
+  ip_mariadb:
+    type: string
+    default: 10.2.0.10
+    description: IP fija asignada al puerto de MariaDB
+
+  red_externa:
+    type: string
+    default: external
+    description: Nombre de la red external (provider) para el gateway del router y la FIP
+
+resources:
+
+  # ------------------------------------------------------------------
+  # RED INTERNA
+  # ------------------------------------------------------------------
+  red:
+    type: OS::Neutron::Net
+    properties:
+      name:
+        str_replace:
+          template: red-NOMBRE
+          params:
+            NOMBRE: { get_param: nombre }
+
+  # ------------------------------------------------------------------
+  # SUBNET 1: NGINX — con DHCP
+  # ------------------------------------------------------------------
+  subnet_1:
+    type: OS::Neutron::Subnet
+    properties:
+      name:
+        str_replace:
+          template: red-NOMBRE-1
+          params:
+            NOMBRE: { get_param: nombre }
+      network: { get_resource: red }
+      cidr:    { get_param: cidr_1 }
+      gateway_ip: { get_param: gateway_1 }
+      enable_dhcp: true
+      dns_nameservers:
+        - 8.8.8.8
+
+  # ------------------------------------------------------------------
+  # SUBNET 2: MariaDB — sin DHCP
+  # ------------------------------------------------------------------
+  subnet_2:
+    type: OS::Neutron::Subnet
+    properties:
+      name:
+        str_replace:
+          template: red-NOMBRE-2
+          params:
+            NOMBRE: { get_param: nombre }
+      network: { get_resource: red }
+      cidr:    { get_param: cidr_2 }
+      gateway_ip: { get_param: gateway_2 }
+      enable_dhcp: false
+
+  # ------------------------------------------------------------------
+  # PUERTO con IP fija para MariaDB
+  # Se crea previamente para asignar la IP de forma determinista.
+  # Al lanzar la VM de MariaDB: --nic port-id=<ID de este puerto>
+  # ------------------------------------------------------------------
+  puerto_mariadb:
+    type: OS::Neutron::Port
+    properties:
+      name:
+        str_replace:
+          template: puerto-NOMBRE-mariadb
+          params:
+            NOMBRE: { get_param: nombre }
+      network: { get_resource: red }
+      fixed_ips:
+        - subnet: { get_resource: subnet_2 }
+          ip_address: { get_param: ip_mariadb }
+
+  # ------------------------------------------------------------------
+  # ROUTER
+  # ------------------------------------------------------------------
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name:
+        str_replace:
+          template: router-NOMBRE
+          params:
+            NOMBRE: { get_param: nombre }
+      external_gateway_info:
+        network: { get_param: red_externa }
+
+  # Conectar subnet-1 al router
+  router_iface_1:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: { get_resource: router }
+      subnet: { get_resource: subnet_1 }
+
+  # Conectar subnet-2 al router
+  router_iface_2:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: { get_resource: router }
+      subnet: { get_resource: subnet_2 }
+
+  # ------------------------------------------------------------------
+  # SECURITY GROUP NGINX: 80, 443, ICMP, SSH desde cualquier origen
+  # ------------------------------------------------------------------
+  sg_nginx:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name:
+        str_replace:
+          template: sg-NOMBRE-nginx
+          params:
+            NOMBRE: { get_param: nombre }
+      description: Reglas para la VM de NGINX - HTTP, HTTPS, ICMP, SSH
+      rules:
+        - direction:    ingress
+          protocol:     tcp
+          port_range_min: 80
+          port_range_max: 80
+          remote_ip_prefix: 0.0.0.0/0
+        - direction:    ingress
+          protocol:     tcp
+          port_range_min: 443
+          port_range_max: 443
+          remote_ip_prefix: 0.0.0.0/0
+        - direction:    ingress
+          protocol:     icmp
+          remote_ip_prefix: 0.0.0.0/0
+        - direction:    ingress
+          protocol:     tcp
+          port_range_min: 22
+          port_range_max: 22
+          remote_ip_prefix: 0.0.0.0/0
+
+  # ------------------------------------------------------------------
+  # SECURITY GROUP MARIADB: 3306, ICMP, SSH solo desde la red interna
+  # ------------------------------------------------------------------
+  sg_mariadb:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name:
+        str_replace:
+          template: sg-NOMBRE-mariadb
+          params:
+            NOMBRE: { get_param: nombre }
+      description: Reglas para la VM de MariaDB - MySQL 3306 solo desde red interna
+      rules:
+        - direction:    ingress
+          protocol:     tcp
+          port_range_min: 3306
+          port_range_max: 3306
+          remote_ip_prefix: { get_param: cidr_1 }
+        - direction:    ingress
+          protocol:     icmp
+          remote_ip_prefix: { get_param: cidr_1 }
+        - direction:    ingress
+          protocol:     tcp
+          port_range_min: 22
+          port_range_max: 22
+          remote_ip_prefix: { get_param: cidr_1 }
+
+  # ------------------------------------------------------------------
+  # FLOATING IP para NGINX
+  # ------------------------------------------------------------------
+  fip_nginx:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: red_externa }
+    depends_on:
+      - router_iface_1
+      - router_iface_2
+
+outputs:
+
+  red_id:
+    description: ID de la red interna
+    value: { get_resource: red }
+
+  subnet_1_id:
+    description: ID de la subnet-1 (NGINX)
+    value: { get_resource: subnet_1 }
+
+  subnet_2_id:
+    description: ID de la subnet-2 (MariaDB)
+    value: { get_resource: subnet_2 }
+
+  puerto_mariadb_id:
+    description: ID del puerto con IP fija para MariaDB
+    value: { get_resource: puerto_mariadb }
+
+  router_id:
+    description: ID del router
+    value: { get_resource: router }
+
+  sg_nginx_id:
+    description: ID del security group para NGINX
+    value: { get_resource: sg_nginx }
+
+  sg_mariadb_id:
+    description: ID del security group para MariaDB
+    value: { get_resource: sg_mariadb }
+
+  fip_nginx:
+    description: Floating IP reservada para NGINX
+    value: { get_attr: [fip_nginx, floating_ip_address] }
+
+  instrucciones_nova:
+    description: Comandos para lanzar las VMs en Nova
+    value:
+      str_replace:
+        template: |
+          VM nginx:    openstack server create --nic net-id=RED_ID     --security-group SG_NGINX   ...
+          VM mariadb:  openstack server create --nic port-id=PUERTO_ID --security-group SG_MARIADB ...
+        params:
+          RED_ID:     { get_resource: red }
+          PUERTO_ID:  { get_resource: puerto_mariadb }
+          SG_NGINX:   { get_resource: sg_nginx }
+          SG_MARIADB: { get_resource: sg_mariadb }
