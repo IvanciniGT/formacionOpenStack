@@ -69,6 +69,7 @@ resources:
           template: red-NOMBRE
           params:
             NOMBRE: { get_param: nombre }
+            # Séase una red con nombre red-NOMBRE
 
   # ------------------------------------------------------------------
   # SUBNET 1: NGINX — con DHCP
@@ -87,6 +88,20 @@ resources:
       enable_dhcp: true
       dns_nameservers:
         - 8.8.8.8
+            # Séase una subnet con DHCP habilitado , gateway gateway_1, DNS 8.8.8.8, CIDR cidr_1 y nombre red-NOMBRE-1
+            # Esto es un concepto... una hipotética subnet... con unos valores.
+            # No digo que la cree, que la borre, que la edite... Ni siquiera digo que debe existir
+            # Solo estoy DECLARANDO una subnet conceptual.
+
+          # Posteriormente, este archivo lo pasaré a HEAT, y le daré una instrucción/orden a HEAT:
+          # $ openstack stack create -t script.yaml --parameter nombre=profesor neutron-stack
+          # $ openstack stack delete neutron-stack
+          # $ openstack stack update neutron-stack -t script.yaml --parameter nombre=alumno1
+          # Ahí si digo ya algo concreto/acción sobre esa subnet conceptual que he declarado en mi fichero.
+          # Y los nombres tampoco son buenos: create / delete
+
+          # Porque realmente a heat no le digo create o delete, lo que le digo realmente es:
+          # Eso debe existir o no debe existir.
 
   # ------------------------------------------------------------------
   # SUBNET 2: MariaDB — sin DHCP
@@ -266,3 +281,15 @@ outputs:
           PUERTO_ID:  { get_resource: puerto_mariadb }
           SG_NGINX:   { get_resource: sg_nginx }
           SG_MARIADB: { get_resource: sg_mariadb }
+
+# Declara una infra de red.
+# Tengo la infra especificada, declarada en un archivo de texto: código!
+# Esto es IaC? En parte... No solo.
+# Os decía que IaC no es solo tener un código que declare la infra,
+# sino tratarla como si fuera código.
+# - Quiero tenerla sometida a control de versiones.
+
+
+---
+
+# DEVOPS

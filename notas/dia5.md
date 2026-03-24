@@ -385,3 +385,108 @@ Usuario: manager, operator, monitoring
         Las 2 las pinchamos.. pero tenemos solo un router.
 
 En todo lo posible trabajamos con el usuario operator.
+
+HARDWARE red-alumno1 (cables, switches...)
+
+SOFTWARE!
+red-alumno1-1     10.1.0.0/24
+    Máquina NGINX (las conecto físicamente a la red hardware, con cable!) 10.1.0.2
+
+red-alumno1-2     10.2.0.0/24
+    Máquina MARIADB (las conecto físicamente a la red hardware, con cable!) 10.2.0.2
+    Máquina RABBIT  (las conecto físicamente a la red hardware, con cable!) 10.2.0.3
+
+    MariaDB y Rabbit pueden hablar ya? Si!
+    Sin problema, estan conectadas a la misma red física, y a la misma red lógica (subnet)
+
+    Máquina Nginx puede hablar con MariaDB? No!
+    No pueden hablar porque aunque estén conectadas a la misma red física, no están conectadas a la misma red lógica (subnet). Están en subnets distintas.
+    Que nos falta? Un router que conecte esas subnets entre si. Algo que nos de la ruta para ir de una subnet a otra.
+    Alguien que me lo explique, como voy de una subnet a otra? Router. 
+
+Esto ya son configuraciones que hago en los switches y brigdes que he montado en capa Hardware.
+
+
+
+---
+
+Que una infra funcione es lo de menos. Se da por descontado.
+Es igual que si hago un programa de software... que funcione es lo de menos... se da por descontado.
+Es igual que si compro un coche... que ande es lo de menos... se da por descontado.
+
+El problema no es solo montar algo que funcione. El problema es montar algo que funcione y sea mantenible en tiempo!
+
+Un coche por definición es un producto sujeto a cambios y mantenimiento.
+
+    Escribir Código <> Pruebas -> OK -> Refactorización <> Pruebas -> OK
+
+
+LCC
+
+Coste del ciclo de vida: Life Cycle Cost. Es el coste total de un producto a lo largo de su ciclo de vida. Incluye el coste de desarrollo/instalación/configuración, el coste de mantenimiento, el coste de evolución... Es decir, el coste total de tener ese producto funcionando a lo largo del tiempo.
+
+Desarrollo -> Coste de desarrollo   != Coste total
+              Coste de operación del sistema (normalmente >>> Coste de desarrollo)
+
+Ingeniería != ciencias exactas (matemáticas, física...)
+
+Matemáticas, física hay leyes inmutables. Es muy binaro: es la solución o no.
+En ingeniería no. Hay restricciones, requisitos, costes, riesgos. Y busco la mejor solución posible teniendo en cuenta todo eso. No hay una solución única, ni una solución perfecta. Hay muchas soluciones posibles, y busco la mejor solución posible teniendo en cuenta todas las restricciones, requisitos, costes y riesgos.
+
+
+---
+
+
+Hemos planteado 3 opciones para que la máquina de nginx sea accesible de la red provider:
+- Conexión directa con SR-IOV
+    Beneficios:
+    - Rendimiento: La que menos latencia ofrece... hay menos componentes en medio, menos software... 
+    Inconvenientes:
+    - Mantenimiento más complejo:
+      - Necesito gestionar las conexiones de red a nivel de la máquina virtual:
+        - Si cambio el CIDR de la red provider, tengo que entrar en cada máquina virtual y cambiar la IP, la puerta de enlace... para que sigan funcionando.
+        - Si quiero mover la máquina virtual a otro nodo físico, tengo que apagar la máquina virtual, desconectar la tarjeta de red física, mover la máquina virtual al nuevo nodo físico, conectar la tarjeta de red física... y eso no tan rápido.
+    - Pierdo funcionaldiades que me da el cloud: Security groups, ...
+- Conexión con OVS + FIP (NAT)
+  - Beneficios:
+    - Mantenimiento más sencillo:
+      - No necesito gestionar las conexiones de red a nivel de la máquina virtual:
+        - Si cambio el CIDR de la red provider, no tengo que entrar en cada máquina virtual y cambiar la IP, la puerta de enlace... para que sigan funcionando.
+        - Si quiero mover la máquina virtual a otro nodo físico, solo tengo que cambiar el puerto lógico en el switch virtual (OVS), y esa máquina se conecta a la red de fuera con la misma IP, la misma mac address... aunque esté en otro nodo físico distinto. Eso es algo que hace OVS, y es algo que hace OVN.
+    - Aprovecho de funcionalidades que me da el cloud: Security groups, ...
+  - Inconvenientes:
+    - Rendimiento: Es la que más latencia ofrece... hay más componentes en medio, más software... 
+- Conexión con OVS directa (sin FIP, sin NAT):
+  - Beneficios:
+    - Menos latencia que con FIP, porque no hay NAT de por medio.
+    - Aprovecho las funcionalidades que me da el cloud: Security groups, ...
+    - Mantenimiento... medio:
+       - Las conexiones a red al final las hago solo por 2 tarjetas (a las que estén conectadas los Bridges externos de OVS)
+       - Las migraciones son más sencillas que con SR-IOV, porque solo tengo que cambiar el puerto lógico en el switch virtual (OVS), y esa máquina se conecta a la red de fuera con la misma IP, la misma mac address... aunque esté en otro nodo físico distinto. Eso es algo que hace OVS, y es algo que hace OVN.
+  - Inconvenientes:
+    - Más latencia que con SR-IOV, porque hay más componentes en medio, más software...
+
+Esto es la teoría.
+Luego viene la realidad: RESTRICCIONES de mi proyecto, costes, recursos , tiempo, riesgos.
+- Si vengo de una migración.. donde tengo 5000 VMs ya configuradas con IPs... y quiero migrarlas a un nuevo entorno... lo que menos quiero es tener que entrar en cada máquina virtual a cambiar la IP, la puerta de enlace... para que sigan funcionando. Eso me hace decantarme por una opción u otra. Quizás esto me hace decantarme por NO LA OPCION OVS + FIP
+- O no... y monto un playbook de ansible que reconfigure todo eso en las 5000 mv.
+
+
+IF( not existe subnet-alumno1-1 )
+    openstack subnet create subnet-alumno1-1 --network red-alumno1 --subnet-range "10.2.0.0/24" --gateway "10.2.0.1" --dns-nameserver 8.8.8.8 
+ELSE
+    IF ha cambiado el CIDR de la subnet-alumno1-1
+        openstack subnet set subnet-alumno1-1 --subnet-range "NUEVO"
+    IF ha cambiado el gateway de la subnet-alumno1-1
+        openstack subnet set subnet-alumno1-1 --gateway "NUEVO"
+
+ME SALE UN PROGRAMA CON 200 lineas de código.
+
+La ejecuto el día 1. Crea la subnet 
+Si la vuelvo a ejecutar el día 1 que me da ? Un ostión en to la cara! La red ya existe
+
+Como la tenemos con parámetros: Cambio el CIDR en día 20
+openstack subnet create subnet-alumno1-1 --network red-alumno1 --subnet-range "10.3.0.0/24" --gateway "10.2.0.1" --dns-nameserver 8.8.8.8 
+Al ejecutar eso, que me da el programa: Mismo ostión!
+
+Me da esos problemas por usar un lenguaje imperativo!
