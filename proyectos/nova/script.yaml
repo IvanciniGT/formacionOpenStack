@@ -1,0 +1,287 @@
+heat_template_version: 2018-08-31
+
+description: >
+  Lanza las instancias Nova para el lab de NGINX + MariaDB.
+
+  PRE-REQUISITOS (deben existir antes de desplegar este stack):
+    - Stack neutron desplegado (proyectos/neutron/script.yaml), que crea:
+        red-NOMBRE, red-NOMBRE-1, sg-NOMBRE-nginx, puerto-NOMBRE-mariadb
+    - Keypair SSH pre-creado:  openstack keypair create keypair-NOMBRE --private-key keypair-NOMBRE.pem
+    - Flavor existente (m1.tiny o similar):  openstack flavor list
+    - Imagen accesible desde el proyecto (pasar ID si hay varias con el mismo nombre)
+
+  Crea:
+    - Puerto nginx (en subnet-1, con sg-NOMBRE-nginx)
+    - VM nginx     (imagen cirros, en puerto_nginx, con floating IP)
+    - VM mariadb   (imagen cirros, en puerto pre-existente con IP 10.2.0.10)
+    - Floating IP  para NGINX + asociación al puerto
+
+# Uso:
+#
+#   1. Desplegar primero el stack de Neutron (si no está creado):
+#        openstack stack create -t ../neutron/script.yaml \
+#          --parameter nombre=profesor neutron-profesor --wait
+#
+#   2. Crear el keypair SSH (UNA SOLA VEZ — guarda el .pem, no se puede recuperar después):
+#        openstack keypair create keypair-profesor --private-key keypair-profesor.pem
+#        chmod 600 keypair-profesor.pem   # Solo Linux/macOS — en Windows no es necesario
+#
+#   3. Obtener el ID del puerto MariaDB del stack neutron:
+#        openstack stack output show neutron-profesor puerto_mariadb_id -f value -c output_value
+#
+#   4. Obtener el ID de tu imagen (puede haber varias con el mismo nombre):
+#        openstack image list --name mi-cirros
+#
+#   5. Desplegar este stack:
+#        openstack stack create -t script.yaml \
+#          --parameter nombre=profesor \
+#          --parameter imagen=<ID-de-tu-mi-cirros> \
+#          --parameter puerto_mariadb_id=<ID-del-paso-3> \
+#          nova-profesor --wait
+#
+#   6. Ver outputs (IP pública, IPs privadas, comandos SSH):
+#        openstack stack output list nova-profesor
+#        openstack stack output show nova-profesor ssh_nginx -f value -c output_value
+#        openstack stack output show nova-profesor ssh_mariadb_via_nginx -f value -c output_value
+#
+#   7. Conectarse a NGINX:
+#        ssh -i keypair-profesor.pem cirros@<ip_publica_nginx>
+#
+#   8. Borrar el stack:
+#        openstack stack delete nova-profesor --wait
+#
+# ---------------------------------------------------------------
+# CLI equivalente (sin Heat) — lo que hace este template a mano:
+# ---------------------------------------------------------------
+#
+#   # 1. Keypair
+#   openstack keypair create keypair-profesor --private-key keypair-profesor.pem
+#   chmod 600 keypair-profesor.pem   # Solo Linux/macOS — en Windows no es necesario
+#
+#   # 2. Flavor personalizado
+#   openstack flavor create flavor-profesor --ram 512 --disk 5 --vcpus 1
+#
+#   # 3. VM nginx (en la red, recibe IP por DHCP en subnet-1)
+#   openstack server create vm-profesor-nginx \
+#     --image mi-cirros \
+#     --flavor flavor-profesor \
+#     --nic net-id=$(openstack network show red-profesor -f value -c id) \
+#     --security-group sg-profesor-nginx \
+#     --key-name keypair-profesor \
+#     --wait
+#
+#   # 4. Floating IP para nginx
+#   FIP=$(openstack floating ip create external -f value -c floating_ip_address)
+#   openstack server add floating ip vm-profesor-nginx $FIP
+#
+#   # 5. VM mariadb (en el puerto fijo con IP 10.2.0.10)
+#   openstack server create vm-profesor-mariadb \
+#     --image mi-cirros \
+#     --flavor flavor-profesor \
+#     --nic port-id=$(openstack port show puerto-profesor-mariadb -f value -c id) \
+#     --key-name keypair-profesor \
+#     --wait
+#
+#   # 6. Conectarse
+#   ssh -i keypair-profesor.pem cirros@$FIP
+#   # Saltar a mariadb desde nginx (jump host):
+#   ssh -i keypair-profesor.pem -J cirros@$FIP cirros@10.2.0.10
+
+parameters:
+
+  nombre:
+    type: string
+    default: profesor
+    description: Sufijo para nombrar los recursos (profesor, alumno1, ...)
+
+  imagen:
+    type: string
+    default: mi-cirros
+    description: >
+      Nombre o ID de la imagen. En este entorno hay varias imágenes con el nombre
+      'mi-cirros' (una por alumno). Si hay ambigüedad, usa el ID concreto de tu imagen:
+        openstack image list --name mi-cirros
+
+  red_externa:
+    type: string
+    default: external
+    description: Nombre de la red externa (provider) para la floating IP
+
+  flavor:
+    type: string
+    default: m1.tiny
+    description: >-
+      Nombre o ID del flavor para las VMs. La creación de flavors requiere rol
+      admin, por lo que se usa uno existente. Listado con: openstack flavor list
+
+  keypair_nombre:
+    type: string
+    default: keypair-profesor
+    description: >
+      Nombre del keypair SSH pre-existente. Crearlo previamente con:
+        openstack keypair create keypair-NOMBRE --private-key keypair-NOMBRE.pem
+
+  puerto_mariadb_id:
+    type: string
+    description: >
+      ID del puerto pre-creado para MariaDB por el stack neutron.
+      Obtenerlo con:
+        openstack stack output show <neutron-stack> puerto_mariadb_id -f value -c output_value
+
+resources:
+
+  # ------------------------------------------------------------------
+  # PUERTO NGINX
+  # Puerto explícito en subnet-1 con security group para NGINX.
+  # Crearlo antes de la VM permite referenciar su ID en la asociación
+  # de la floating IP sin necesidad de conocer la IP dinámica asignada.
+  # ------------------------------------------------------------------
+  puerto_nginx:
+    type: OS::Neutron::Port
+    properties:
+      name:
+        str_replace:
+          template: puerto-NOMBRE-nginx
+          params:
+            NOMBRE: { get_param: nombre }
+      network:
+        str_replace:
+          template: red-NOMBRE
+          params:
+            NOMBRE: { get_param: nombre }
+      fixed_ips:
+        - subnet:
+            str_replace:
+              template: red-NOMBRE-1
+              params:
+                NOMBRE: { get_param: nombre }
+      security_groups:
+        - str_replace:
+            template: sg-NOMBRE-nginx
+            params:
+              NOMBRE: { get_param: nombre }
+
+  # ------------------------------------------------------------------
+  # VM NGINX
+  # Conectada al puerto_nginx (subnet-1, DHCP), con floating IP.
+  # Equivalente CLI:
+  #   openstack server create vm-NOMBRE-nginx \
+  #     --image mi-cirros --flavor flavor-NOMBRE \
+  #     --nic port-id=<puerto_nginx_id> --key-name keypair-NOMBRE --wait
+  # ------------------------------------------------------------------
+  vm_nginx:
+    type: OS::Nova::Server
+    properties:
+      name:
+        str_replace:
+          template: vm-NOMBRE-nginx
+          params:
+            NOMBRE: { get_param: nombre }
+      image:    { get_param: imagen }
+      flavor:   { get_param: flavor }
+      key_name: { get_param: keypair_nombre }
+      networks:
+        - port: { get_resource: puerto_nginx }
+
+  # ------------------------------------------------------------------
+  # VM MARIADB
+  # Usa el puerto pre-existente del stack neutron (IP fija 10.2.0.10).
+  # El SG sg-NOMBRE-mariadb ya está asignado en ese puerto.
+  # Equivalente CLI:
+  #   openstack server create vm-NOMBRE-mariadb \
+  #     --image mi-cirros --flavor flavor-NOMBRE \
+  #     --nic port-id=<puerto_mariadb_id> --key-name keypair-NOMBRE --wait
+  # ------------------------------------------------------------------
+  vm_mariadb:
+    type: OS::Nova::Server
+    properties:
+      name:
+        str_replace:
+          template: vm-NOMBRE-mariadb
+          params:
+            NOMBRE: { get_param: nombre }
+      image:    { get_param: imagen }
+      flavor:   { get_param: flavor }
+      key_name: { get_param: keypair_nombre }
+      networks:
+        - port: { get_param: puerto_mariadb_id }
+
+  # ------------------------------------------------------------------
+  # FLOATING IP para NGINX
+  # Se crea independientemente del stack neutron para mantener
+  # el ciclo de vida de la IP ligado a este stack.
+  # Equivalente CLI:
+  #   openstack floating ip create external
+  # ------------------------------------------------------------------
+  fip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: red_externa }
+    depends_on:
+      - vm_nginx
+
+  # ------------------------------------------------------------------
+  # ASOCIACIÓN FIP → puerto NGINX
+  # Equivalente CLI:
+  #   openstack server add floating ip vm-NOMBRE-nginx <fip>
+  # ------------------------------------------------------------------
+  fip_asociacion:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: fip }
+      port_id:       { get_resource: puerto_nginx }
+
+outputs:
+
+  ip_publica_nginx:
+    description: Floating IP pública de la VM NGINX
+    value: { get_attr: [fip, floating_ip_address] }
+
+  ip_privada_nginx:
+    description: IP privada de la VM NGINX (subnet-1, asignada por DHCP)
+    value: { get_attr: [vm_nginx, first_address] }
+
+  ip_privada_mariadb:
+    description: IP privada de la VM MariaDB (subnet-2, IP fija 10.2.0.10)
+    value: { get_attr: [vm_mariadb, first_address] }
+
+  keypair_nombre:
+    description: Keypair SSH usado por las VMs
+    value: { get_param: keypair_nombre }
+
+  flavor_usado:
+    description: Flavor usado para las VMs
+    value: { get_param: flavor }
+
+  ssh_nginx:
+    description: Comando SSH para conectarse directamente a NGINX
+    value:
+      str_replace:
+        template: ssh -i keypair-NOMBRE.pem cirros@FIP
+        params:
+          NOMBRE: { get_param: nombre }
+          FIP:    { get_attr: [fip, floating_ip_address] }
+
+  ssh_mariadb_via_nginx:
+    description: Comando SSH para llegar a MariaDB a través de NGINX (jump host)
+    value:
+      str_replace:
+        template: ssh -i keypair-NOMBRE.pem -J cirros@FIP cirros@IP_MARIADB
+        params:
+          NOMBRE:     { get_param: nombre }
+          FIP:        { get_attr: [fip, floating_ip_address] }
+          IP_MARIADB: { get_attr: [vm_mariadb, first_address] }
+
+
+
+
+parameters:
+  public_key:
+    type: string
+
+resources:
+  keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: keypair-NOMBRE
+      public_key: { get_param: public_key }

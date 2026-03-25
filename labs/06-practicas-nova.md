@@ -139,12 +139,12 @@ openstack flavor list
 
 ```bat
 rem Muestra todos los detalles de un flavor concreto.
-openstack flavor show m1.small
+openstack flavor show m1.tiny
 ```
 
 ### Qué debes observar
 
-- Los flavors disponibles (m1.small, m1.medium...) los gestiona el administrador
+- Los flavors disponibles (m1.tiny, m1.small, m1.medium...) los gestiona el administrador
 - Tú podrás crear tus propios flavors personalizados (siguiente sección)
 - La imagen `mi-cirros` es la que usarás para lanzar las VMs del lab
 
@@ -176,7 +176,7 @@ openstack flavor show flavor-alumno1
 
 ### Preguntas
 
-1. ¿En qué se diferencia `flavor-alumno1` de `m1.small`?
+1. ¿En qué se diferencia `flavor-alumno1` de `m1.tiny`?
 2. ¿Qué pasaría si creas un flavor con más RAM de la que tiene el hipervisor?
 3. ¿El disco del flavor es un volumen Cinder? ¿Qué es exactamente?
 

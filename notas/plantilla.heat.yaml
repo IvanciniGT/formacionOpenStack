@@ -1,0 +1,73 @@
+# El archivo define un stack, que poder gestionar en el cloud desde heat.
+# HEAT está muy pensado para hacer despliegues completos, es decir, para soltar un stack completo con todos los recursos necesarios para una aplicación completa.
+# Estos archivos de HEAT se llamano HOT (Heat Orchestration Template)
+
+# La versión de la plantilla de HEAT que estamos usando. Es importante usar una versión que sea compatible con la versión de HEAT que tenemos en nuestro cloud, para asegurarnos de que todas las funcionalidades que queremos usar estén disponibles.
+heat_template_version: 2018-08-31   
+
+# Una descripción de lo que hace el stack. 
+description: >
+    Stack de ejemplo para el curso de Openstack. 
+    Este stack crea una red, una subnet, un router, una máquina virtual y una floating IP.
+
+# Los parámetros de entrada al script.
+# Este stack de infraestrucura podré aplicarlo a varios proyectos... o a varios clientes... o en varios entornos (desarrollo, preproducción, producción)...Me puede interesar personalziar los nombres.
+parameters:   
+
+#    nombre_parametro:
+#        type: string # Tipo de dato del parámetro. Puede ser string, number, boolean, list, map, etc...
+#        default: valor_por_defecto # Valor por defecto del parámetro. Si no se le pasa un valor al script, se usará este valor por defecto.
+#        description: > # Descripción del parámetro. Es importante poner una descripción clara y conc
+
+# Los recursos que se van a crear, actualizar o borrar.
+resources:    
+
+  #nombre_de_recurso_en_el_script:  # Este nombre me permite referirme a este recurso dentro del script.
+                                   # Por ejemplo, puedo tener un recurso que sea la IP flotante... lo llamo: mi_ip_flotante
+                                   # En un output puedo referirme a este recurso apra sacar la ip
+                                   #  value: { get_attr: [mi_ip_flotante, floating_ip_address] }
+                                   # No es el nombre con el que aparece en Openstack
+    #type: OS::COMPONENTE_OS::TIPO_Recurso # Tipo de recurso que se va a crear. 
+                            # Por ejemplo, OS::Nova::Server para una máquina virtual, 
+                            #              OS::Neutron::Net para una red, 
+                            #              OS::NEUTRON::Port para un puerto,
+                            # En la documentación de HEAT, tenéis el listado de tipos de recursos disponibles para cada componente de Openstack.
+                            # https://docs.openstack.org/heat/latest/template_guide/openstack.html#OS::Neutron::FloatingIP
+    #properties: # Propiedades del recurso. Cada tipo de recurso tiene unas propiedades específicas que se pueden configurar.
+                # Las que vienen en la documentación anterior
+                # Hay propiedades que encuentro siempre:
+        #name: nombre_del_recurso_en_openstack # Nombre del recurso en Openstack. Es el nombre que aparecerá en la lista de recursos de Openstack.
+        # otras propiedades... depende del tipo de recurso que sea. Por ejemplo, una máquina virtual tendrá propiedades como image, flavor, network, etc... 
+        # mientras que una red tendrá propiedades como cidr, gateway, etc...
+# Los datos de salida del script.
+# Mi plantilla desplegará un stack. Una infra.
+# Qué me puede interesar conocer de esa infra?
+# - La IP esa flotante que se ha creado para la máquina virtual, para poder conectarme a ella por SSH.
+# - Las claves, los IDs de los recursos.
+# Tened en cuenta una cosa, una visión más amplia de este cotarro.
+# Yo montaré una plantilla... que se ejecutará:
+# - Cuándo?
+#    Cuando necesite crear la infra.
+#    Cuando ocurra un cambio en la infra.
+# - Quién la ejecutará?
+#    Yo? apretando un botón en horizon? NI DE COÑA! Un pipeline de Jenkins: openstack stack create...
+# - En qué contexto?
+#    Una vez creada la infra, ya están resueltos todos los problemas del universo? 
+#    NO... esa es la misma visión CUTRE y cerrada (endogamica) que tenían los desarrolles pensando que
+#    después de acabar el desarrollo ya estaban resueltos todos los problemas del mundo.
+# 
+#   Una vez creadas 4 mvs... que haré con ellas?
+#   - Probarlas
+#   - Configurarlas
+#       - Montaré usuarios especiales.
+#       - Le instalaré un agente de monitorización.
+#       - Le actvo el SELINUX
+#   - Dependencias / paquetería
+#   - Instalarle programas MYSQL
+#   - Configurarle MYSQL
+outputs:      
+
+  #nombre_output:
+  #  description: #Descripción del output. Es importante poner una descripción clara y concisa de lo que representa este output.
+  #  value:       # Valor del output. Puede será dato de un recurso que he creado: ID, IP
+

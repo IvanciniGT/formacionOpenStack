@@ -166,6 +166,7 @@ openstack flavor list
 +--------------------------------------+-----------+-------+------+-----------+-------+-----------+
 | 067f9ee8-1ead-44e9-9498-ae615ed7a9c9 | m1.medium |  4096 |   40 |         0 |     2 | True      |
 | 35ad9481-01df-41f7-aa9d-60fe2ea0e01c | m1.xlarge | 16384 |  160 |         0 |     8 | True      |
+| d6fbefd3-1049-4513-be15-30a1864c73e4 | m1.tiny   |   512 |    1 |         0 |     1 | True      |
 | de217e91-230d-49f9-a464-7aaf5b311ef8 | m1.small  |  2048 |   20 |         0 |     1 | True      |
 | ecec2f7b-2ff3-4374-a69e-6127286b8b59 | m1.large  |  8192 |   80 |         0 |     4 | True      |
 +--------------------------------------+-----------+-------+------+-----------+-------+-----------+
@@ -180,7 +181,7 @@ openstack flavor list
 ### 2.4 Ver detalles de un flavor
 
 ```bat
-openstack flavor show m1.small
+openstack flavor show m1.tiny
 ```
 
 **Salida:**
@@ -188,10 +189,10 @@ openstack flavor show m1.small
 +----------------------------+--------------------------------------+
 | Field                      | Value                                |
 +----------------------------+--------------------------------------+
-| id                         | de217e91-230d-49f9-a464-7aaf5b311ef8 |
-| name                       | m1.small                             |
-| ram                        | 2048                                 |
-| disk                       | 20                                   |
+| id                         | d6fbefd3-1049-4513-be15-30a1864c73e4 |
+| name                       | m1.tiny                              |
+| ram                        | 512                                  |
+| disk                       | 1                                    |
 | vcpus                      | 1                                    |
 | OS-FLV-EXT-DATA:ephemeral  | 0                                    |
 | os-flavor-access:is_public | True                                 |
@@ -199,8 +200,8 @@ openstack flavor show m1.small
 +----------------------------+--------------------------------------+
 ```
 
-> `m1.small`: 2 GB RAM, 20 GB disco, 1 vCPU. Es el flavor que usarás para el resize
-> en la práctica 6.
+> `m1.tiny`: 512 MB RAM, 1 GB disco, 1 vCPU. El flavor más ligero, ideal para pruebas con cirros.
+> Para el resize de la práctica 6 se usa `m1.small` (2 GB RAM, 20 GB disco).
 
 ---
 
