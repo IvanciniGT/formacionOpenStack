@@ -1,7 +1,7 @@
 heat_template_version: 2018-08-31
 
 description: >
-    Plantilla all-in-one para el despliegue de 2 VMs (NGINX + MariaDB).
+    Plantilla all-in-one para el despliegue de 3 VMs (NGINX + NGINX2 con disco Cinder + MariaDB).
     Crea toda la infraestructura de red (Neutron) y cómputo (Nova) en un solo stack.
 
     PRE-REQUISITOS (deben existir antes de desplegar):
@@ -23,6 +23,7 @@ description: >
       - Security group nginx  (ICMP + SSH + puertos configurables) + puerto nginx
       - Security group mariadb (3306 + SSH + ICMP, solo desde subnet middleware) + puerto mariadb (IP fija)
       - VM nginx   (subnet middleware, floating IP pública)
+      - VM nginx2  (subnet middleware, floating IP pública, disco persistente Cinder)
       - VM mariadb (subnet backend, IP fija)
 
 
@@ -56,7 +57,7 @@ description: >
 # --- CREAR EL STACK ---
 #
 #   1. Generar clave SSH (si no tienes una):
-#        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_heat
+#        ssh-keygen -t rsa -b 2048 -f .\id_rsa_heat
 #        # Windows (PowerShell): ssh-keygen -t rsa -b 2048 -f $HOME\.ssh\id_rsa_heat
 #
 #   2. Obtener el ID de la imagen:
@@ -205,7 +206,7 @@ parameters:
       type:           string
       description:    Prefijo para los nombres de los recursos (red, router, security groups, puertos, máquinas virtuales, etc...)
       constraints:    
-        - allowed_pattern: ^[a-z-]+$   # El prefijo solo puede contener letras minúsculas y guiones.
+        - allowed_pattern: ^[a-z0-9-]+$   # El prefijo solo puede contener letras minúsculas y guiones.
           description: El prefijo para los nombres de los recursos debe contener solo letras minúsculas y guiones.
 
     cidr_subnet_middleware:
@@ -300,6 +301,14 @@ parameters:
         - allowed_pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}$
           description: Debe ser una IP válida (formato x.x.x.x)
       default:        10.2.0.10
+
+    tamano_volumen_nginx2:
+      type:           number
+      description:    Tamaño en GB del volumen Cinder persistente para la VM nginx2
+      constraints:
+        - range:      { min: 1, max: 1000 }
+          description: El tamaño del volumen debe estar entre 1 y 1000 GB
+      default:        1
 
 resources:
 
@@ -464,6 +473,16 @@ resources:
             port_range_min: 22
             port_range_max: 22
             remote_ip_prefix: { get_param: cidr_subnet_middleware }
+          - direction: ingress
+            protocol:  tcp
+            port_range_min: 80
+            port_range_max: 80
+            remote_ip_prefix: { get_param: cidr_subnet_middleware }
+          - direction: ingress
+            protocol:  tcp
+            port_range_min: 81
+            port_range_max: 81
+            remote_ip_prefix: { get_param: cidr_subnet_middleware }
 
     puerto_mariadb:
       type: OS::Neutron::Port
@@ -565,6 +584,66 @@ resources:
               CIDR_BACKEND: { get_param: cidr_subnet_backend }
               GW_BACKEND:   { get_param: gateway_subnet_backend }
 
+    volumen_nginx2:
+      type: OS::Cinder::Volume
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-volumen-nginx2
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        size:   { get_param: tamano_volumen_nginx2 }
+        image:  { get_param: imagen_nginx }
+        # delete_on_termination es propiedad del attachment, no del volumen.
+        # El volumen persiste al borrar la VM porque block_device_mapping_v2
+        # usa delete_on_termination: false en vm_nginx2.
+
+    puerto_nginx2:
+      type: OS::Neutron::Port
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-puerto-nginx2
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        network: { get_resource: net_privada }
+        fixed_ips:
+          - subnet: { get_resource: subnet_middleware }
+        security_groups:
+          - { get_resource: security_group_nginx }
+
+    vm_nginx2:
+      type: OS::Nova::Server
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-vm-nginx2
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        flavor:   { get_param: sabor_nginx }
+        key_name: { get_resource: clave_ssh }
+        networks:
+          - port: { get_resource: puerto_nginx2 }
+        # Boot desde volumen Cinder. delete_on_termination: false → el volumen
+        # sobrevive aunque se borre la VM (disco persistente).
+        block_device_mapping_v2:
+          - boot_index:            0
+            delete_on_termination: false
+            volume_id:             { get_resource: volumen_nginx2 }
+
+    ip_flotante_nginx2:
+      type: OS::Neutron::FloatingIP
+      properties:
+        floating_network: { get_param: red_externa }
+      depends_on:
+        - router_iface_middleware
+
+    asignacion_ip_flotante_nginx2:
+      type: OS::Neutron::FloatingIPAssociation
+      properties:
+        floatingip_id: { get_resource: ip_flotante_nginx2 }
+        port_id:       { get_resource: puerto_nginx2 }
+
 outputs:
 
     id_red_privada:
@@ -638,3 +717,19 @@ outputs:
     numero_puerto_mariadb:
       description: Puerto TCP de MariaDB
       value: { get_param: numero_puerto_mariadb }
+
+    id_vm_nginx2:
+      description: ID de la VM NGINX2 (disco persistente Cinder)
+      value: { get_resource: vm_nginx2 }
+
+    id_volumen_nginx2:
+      description: ID del volumen Cinder persistente de NGINX2
+      value: { get_resource: volumen_nginx2 }
+
+    ip_flotante_vm_nginx2:
+      description: Floating IP de acceso público a la VM NGINX2
+      value: { get_attr: [ip_flotante_nginx2, floating_ip_address] }
+
+    ip_interna_vm_nginx2:
+      description: IP privada de la VM NGINX2 (subnet middleware, asignada por DHCP)
+      value: { get_attr: [vm_nginx2, first_address] }

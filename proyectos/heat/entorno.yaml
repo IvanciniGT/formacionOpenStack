@@ -1,10 +1,15 @@
 # Fichero de entorno Heat para la plantilla all-in-one (plantilla.yaml).
 #
 # Uso:
-#   openstack stack create -t plantilla.yaml \
-#     -e entorno-profesor.yaml \
-#     --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" \
+#   openstack stack create -t plantilla.yaml ^
+#     -e entorno.yaml ^
+#     --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" ^
 #     heat-profesor --wait
+#   openstack stack update -t plantilla.yaml ^
+#     -e entorno.yaml ^
+#     --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" ^
+#     heat-profesor --wait
+#   openstack stack delete heat-profesor --wait
 #
 # IMPORTANTE: clave_ssh_publica NO se incluye aquí por seguridad.
 #             Pásala siempre por --parameter en la línea de comandos.
@@ -13,7 +18,7 @@
 
 parameter_defaults:
 
-  prefijo_nombre_recursos:  profesor
+  prefijo_nombre_recursos:  alumno17-heat
 
   # Imagen: obtén el ID con:  openstack image list --name mi-cirros
   imagen_nginx:             1ea06b64-f852-4125-b80f-c9417c1f38ea
