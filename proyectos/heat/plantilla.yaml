@@ -584,6 +584,24 @@ resources:
               CIDR_BACKEND: { get_param: cidr_subnet_backend }
               GW_BACKEND:   { get_param: gateway_subnet_backend }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     volumen_nginx2:
       type: OS::Cinder::Volume
       properties:

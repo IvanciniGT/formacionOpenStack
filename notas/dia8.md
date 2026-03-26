@@ -185,3 +185,32 @@ Cómputo:
 Orquestación:
 - Heat: Orquestación de recursos (Stack, Template, etc)
 
+---
+
+Nuestras MV siempre tiene almacenamiento.
+- Efimero       ***
+- Persistente    > CINDER
+
+Cinder me permite la creación de volumenes.
+Al usarlo, esos volumenes los podemos usar de 2 formas:
+- Volumen raíz: El volumen que se crea para la MV es el volumen raíz, es decir, el que contiene el sistema operativo <- El volumen se crea desde una imagen de glance (o desde un snapshot de otro volumen)
+- Volumen adicional: El volumen se crea vacío, y luego lo monto en la MV para usarlo como almacenamiento adicional (tipo un disco duro adicional).. en este caso, tendre que decirle en que dispositivo lo monto (/dev/vdb, etc) y luego formatearlo y montarlo dentro de la MV.
+
+---
+
+Volume: Un volumen de bloque que puedo usar (montar) en las MVs... puede ser raíz (imágen) o adicional.
+
+Snapshot
+
+
+, Backup, Volume Groups, Volume Group Snapshot
+
+
+---
+
+RED
+- Subnets
+- Floating IPs
+- Security groups
+- Router
+- Ports
