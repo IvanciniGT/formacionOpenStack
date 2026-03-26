@@ -1,32 +1,170 @@
 heat_template_version: 2018-08-31
 
 description: >
-    Plantilla para el despliegue de 2 máquinas virtuales para los proyectos
-    de ejemplo de la formación:
-    - VM CirrOS (Nginx)
-    - VM CirrOS (MariaDB)
+    Plantilla all-in-one para el despliegue de 2 VMs (NGINX + MariaDB).
+    Crea toda la infraestructura de red (Neutron) y cómputo (Nova) en un solo stack.
+
+    PRE-REQUISITOS (deben existir antes de desplegar):
+      - Flavor:    openstack flavor list    (pasar nombre como sabor_nginx / sabor_mariadb)
+      - Imagen:    openstack image list     (pasar ID como imagen_nginx / imagen_mariadb)
+      - Red ext:   openstack network list   (pasar nombre como red_externa, ej: "external")
+      - SSH key:   ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_heat
+                   (pasar el contenido del .pub como clave_ssh_publica)
+
+    Parámetros SIN default (deben pasarse al desplegar):
+      sabor_nginx, sabor_mariadb, red_externa,
+      imagen_nginx, imagen_mariadb,
+      prefijo_nombre_recursos, clave_ssh_publica
+
+    Crea:
+      - Keypair SSH (registra la clave pública en el proyecto)
+      - Red privada + subnet middleware (DHCP 10.1.0.0/24) + subnet backend (sin DHCP 10.2.0.0/24)
+      - Router con gateway a red externa + interfaces a ambas subnets
+      - Security group nginx  (ICMP + SSH + puertos configurables) + puerto nginx
+      - Security group mariadb (3306 + SSH + ICMP, solo desde subnet middleware) + puerto mariadb (IP fija)
+      - VM nginx   (subnet middleware, floating IP pública)
+      - VM mariadb (subnet backend, IP fija)
 
 
-# Claves SSH.
-
-# Si las creo aquí... me temo que hay probabilidad de que queden por ahí!
-# La claves las creo yo... y eso si, he de registrar la clave pública en el proyecto para que luego pueda usarla en la plantilla.
-# El registro es lo que podría hacer aquí de la clave pública!
-# Puedo generar esas claves con :
-# $ ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_proyecto           # Ese comando en windows? Nasti. puedo ir a un linux a generarlo..
-# También lo puedo generar en un servicio web como https://www.ssh-keygen.com/ o https://www.ssh.com/ssh/keygen/ o github.com/ssh-keygen/ssh-keygen
-# Pero en la descarga de la clave privada... ésta podría haber sido vulnerada
-# Lo normal es que la clave prvada la genero en mi entorno.
-
-# El cliente de openstack me genera clave clave keypair.. públic y privada... Solo que si uso esto, ya se registra en automático la pública en el proyecto... 
-# Y está bien.. pero entonces no la pongo aquí como recurso.. la pongo como parámetro
-
-# Resumen:
-
-# OPCION 1: Si tengo claves ssh o las genero con algo com ssh-keygen... las genero en mi entorno... 
-# y luego registro la clave pública en el proyecto de openstack. Y entonces la pongo aquí como recurso.
-# OPCION 2: La genero con el cli de openstack... y entonces no la pongo aquí como recurso... 
-# la pongo como parámetro... y el valor del parámetro es el nombre/ID de la clave que ya tengo registrada en el proyecto.
+# ==============================================================
+# CLAVES SSH
+# ==============================================================
+#
+# La clave privada NUNCA debe subirse a la plantilla ni al repositorio.
+# Siempre se genera en tu entorno local y solo se registra la clave PÚBLICA.
+#
+# Opciones para generar el par de claves:
+#
+#   OPCIÓN A — ssh-keygen (recomendado):
+#     Linux/macOS:  ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_heat
+#     Windows:      ssh-keygen -t rsa -b 2048 -f $HOME\.ssh\id_rsa_heat
+#
+#   OPCIÓN B — CLI de OpenStack (solo la privada queda en tu equipo, la pública la gestiona Openstack):
+#     openstack keypair create mi-keypair --private-key ~/.ssh/mi-keypair.pem
+#     # En este caso NO uses esta plantilla para registrar la clave;
+#     # pásala como parámetro nombre_keypair a la plantilla directamente.
+#
+#   OPCIÓN C — servicio web (NO recomendado en producción):
+#     La clave privada podría haber sido comprometida en el servidor que la generó.
+#
+# Esta plantilla usa OPCIÓN A: registras la clave pública vía parámetro clave_ssh_publica.
+#
+# ==============================================================
+# USO
+# ==============================================================
+#
+# --- CREAR EL STACK ---
+#
+#   1. Generar clave SSH (si no tienes una):
+#        ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa_heat
+#        # Windows (PowerShell): ssh-keygen -t rsa -b 2048 -f $HOME\.ssh\id_rsa_heat
+#
+#   2. Obtener el ID de la imagen:
+#        openstack image list --name mi-cirros
+#
+#   3. (Opcional pero recomendado) Crear un fichero de entorno con los parámetros:
+#
+#        Heat admite ficheros de entorno en YAML (flag -e / --environment-file).
+#        Evitan repetir --parameter en cada despliegue y permiten versionar los valores
+#        junto con la plantilla (¡sin meter la clave SSH en el fichero!).
+#
+#        Estructura del fichero (p.ej. entorno-profesor.yaml):
+#
+#          parameter_defaults:
+#            prefijo_nombre_recursos: profesor
+#            imagen_nginx:            <ID-imagen>
+#            imagen_mariadb:          <ID-imagen>
+#            sabor_nginx:             m1.tiny
+#            sabor_mariadb:           m1.tiny
+#            red_externa:             external
+#            # clave_ssh_publica: NO la pongas aquí — pásala siempre por --parameter
+#            #                    para no guardar claves en ficheros de texto plano.
+#
+#        Ver entorno-profesor.yaml como ejemplo de partida (en este mismo directorio).
+#
+#        Se puede mezclar fichero de entorno + parámetros en línea
+#        (la línea de comandos sobreescribe lo del fichero):
+#
+#   Desplegar el stack con fichero de entorno (Linux/macOS):
+#        openstack stack create -t plantilla.yaml \
+#          -e entorno-profesor.yaml \
+#          --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" \
+#          heat-profesor --wait
+#
+#        # Windows (PowerShell):
+#          openstack stack create -t plantilla.yaml `
+#            -e entorno-profesor.yaml `
+#            --parameter "clave_ssh_publica=$(Get-Content ~\.ssh\id_rsa_heat.pub)" `
+#            heat-profesor --wait
+#
+#   Desplegar SIN fichero de entorno (pasando todo por --parameter):
+#        openstack stack create -t plantilla.yaml \
+#          --parameter prefijo_nombre_recursos=profesor \
+#          --parameter imagen_nginx=<ID-imagen> \
+#          --parameter imagen_mariadb=<ID-imagen> \
+#          --parameter sabor_nginx=m1.tiny \
+#          --parameter sabor_mariadb=m1.tiny \
+#          --parameter red_externa=external \
+#          --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" \
+#          heat-profesor --wait
+#
+#   4. Ver estado y outputs:
+#        openstack stack list
+#        openstack stack show heat-profesor
+#        openstack stack output list heat-profesor
+#        openstack stack output show heat-profesor ip_flotante_vm_nginx -f value -c output_value
+#
+#   5. Conectarse a NGINX:
+#        ssh -i ~/.ssh/id_rsa_heat cirros@<ip_flotante>
+#
+#   6. Conectarse a MariaDB (via NGINX como jump host):
+#        ssh -i ~/.ssh/id_rsa_heat -J cirros@<ip_flotante> cirros@10.2.0.10
+#
+#
+# --- MODIFICAR EL STACK (stack update) ---
+#
+#   Heat compara el estado actual de la infra con el estado deseado en la plantilla
+#   y aplica solo los cambios necesarios (actualiza, recrea o no toca cada recurso).
+#
+#   Cambiar uno o varios parámetros sin tocar la plantilla:
+#        openstack stack update heat-profesor \
+#          --parameter sabor_nginx=m1.small \
+#          --existing --wait
+#        # --existing reutiliza los parámetros anteriores; solo sobreescribe los que indiques.
+#
+#   Cambiar la plantilla (p.ej. añades un puerto nuevo al SG):
+#        openstack stack update heat-profesor \
+#          -t plantilla.yaml \
+#          --existing --wait
+#
+#   Ver qué va a cambiar ANTES de aplicarlo (preview):
+#        openstack stack update --dry-run heat-profesor \
+#          -t plantilla.yaml --existing
+#
+#   Ver el historial de cambios del stack:
+#        openstack stack event list heat-profesor
+#
+#   IMPORTANTE — qué hace Heat con cada tipo de recurso al actualizar:
+#     · Recurso actualizable (SG, subnet CIDR...): lo modifica en caliente.
+#     · Recurso NO actualizable (keypair, server con imagen distinta...):
+#       lo BORRA y lo vuelve a crear. ¡Puede causar downtime!
+#     · Recurso sin cambios: no lo toca.
+#
+#
+# --- BORRAR EL STACK ---
+#
+#   Borra el stack y TODOS sus recursos en el orden inverso al de creación:
+#        openstack stack delete heat-profesor --wait
+#
+#   Sin confirmación interactiva (útil en scripts):
+#        openstack stack delete heat-profesor --wait --yes
+#
+#   Si el borrado se queda colgado en DELETE_IN_PROGRESS, abandona el estado:
+#        openstack stack abandon heat-profesor
+#        # Esto marca el stack como borrado en Heat sin eliminar los recursos reales.
+#        # Tendrás que limpiar los recursos manualmente (VMs, puertos, redes...).
+#        openstack server list
+#        openstack network list
 
 parameters:
 
@@ -107,15 +245,15 @@ parameters:
       type:           comma_delimited_list     # Donde pondremos una lista que heat interpreta como strings
                                                # No hay lista de numeros.
       description:    Números de puerto del nginx (separados por comas)
-      constraints:    
-        - allowed_pattern: ^([0-9]{1,5},)*[0-9]{1,5}$   # La lista de números de puerto debe tener el formato x,x,x donde x es un número entre 1 y 65535.
-          description: La lista de números de puerto del nginx debe tener el formato x,x,x donde x es un número entre 1 y 65535.
+      # NOTA: Heat NO soporta allowed_pattern en comma_delimited_list — es una limitación conocida.
+      # No se puede validar el formato de la lista aquí; el error saltará al crear el security group
+      # si se pasa un valor inválido (número de puerto fuera de rango, etc.).
       default:        80,443
 
     numero_puerto_mariadb:
       type:           number
       constraints:    
-        - range:      [1, 65535]
+        - range:      { min: 1, max: 65535 }
           description: El número de puerto del mariadb debe estar entre 1 y 65535
       default:        3306
       # Es importante poner estos constrains? IMPORTANTISIMO!
@@ -147,6 +285,21 @@ parameters:
       # Con el caso de los puertos de nginx (que son una lista...de textos)... estamos JODIDOS!
 
       # Las capacidades de validación de Terraform, son una locura comparadas con las de HEAT.
+
+    clave_ssh_publica:
+      type:           string
+      description:    >
+        Clave pública SSH (contenido del fichero .pub generado con ssh-keygen).
+        En Linux/macOS:  cat ~/.ssh/id_rsa.pub
+        En Windows:      Get-Content ~\.ssh\id_rsa.pub
+
+    ip_mariadb:
+      type:           string
+      description:    IP fija para la VM de MariaDB (debe estar en el rango de cidr_subnet_backend)
+      constraints:
+        - allowed_pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}$
+          description: Debe ser una IP válida (formato x.x.x.x)
+      default:        10.2.0.10
 
 resources:
 
@@ -182,12 +335,12 @@ resources:
       properties:
         name:
           str_replace:
-            template: PREFIJO-red-privada
+            template:   PREFIJO-red-privada
             params:
-              PREFIJO: { get_param: prefijo_nombre_recursos }
+              PREFIJO:  { get_param: prefijo_nombre_recursos }
 
     subnet_middleware:
-        type: OS::Neutron::Subnet
+        type:           OS::Neutron::Subnet
         properties:
           name:
             str_replace:
@@ -202,59 +355,286 @@ resources:
                         - 8.8.8.8
 
     subnet_backend:
+      type: OS::Neutron::Subnet
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-subnet-backend
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        network:     { get_resource: net_privada }
+        cidr:        { get_param: cidr_subnet_backend }
+        gateway_ip:  { get_param: gateway_subnet_backend }
+        enable_dhcp: false
 
     router:
+      type: OS::Neutron::Router
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-router
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        external_gateway_info:
+          network: { get_param: red_externa }
+
+    router_iface_middleware:
+      type: OS::Neutron::RouterInterface
+      properties:
+        router: { get_resource: router }
+        subnet: { get_resource: subnet_middleware }
+
+    router_iface_backend:
+      type: OS::Neutron::RouterInterface
+      properties:
+        router: { get_resource: router }
+        subnet: { get_resource: subnet_backend }
 
     security_group_nginx:
+      type: OS::Neutron::SecurityGroup
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-sg-nginx
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        description: Reglas para la VM de NGINX (SSH, ICMP y puertos de numeros_puerto_nginx)
+        # list_concat combina las reglas fijas (SSH, ICMP) con las generadas dinámicamente
+        # por repeat a partir del parámetro numeros_puerto_nginx (comma_delimited_list).
+        #
+        # NOTA sobre tipos (punto 2):
+        # numeros_puerto_nginx es comma_delimited_list → sus elementos son STRINGS ("80", "443").
+        # port_range_min/max esperan enteros, pero la API de Neutron acepta la coerción string→int
+        # en la mayoría de entornos. Si tu entorno es estricto y falla, la solución es
+        # definir los puertos como parámetros number separados en lugar de una lista.
+        rules:
+          list_concat:
+            - - direction: ingress
+                protocol:  icmp
+                remote_ip_prefix: 0.0.0.0/0
+              - direction: ingress
+                protocol:  tcp
+                port_range_min: 22
+                port_range_max: 22
+                remote_ip_prefix: 0.0.0.0/0
+            - repeat:
+                for_each:
+                  <%PUERTO%>: { get_param: numeros_puerto_nginx }
+                template:
+                  direction: ingress
+                  protocol:  tcp
+                  port_range_min: <%PUERTO%>
+                  port_range_max: <%PUERTO%>
+                  remote_ip_prefix: 0.0.0.0/0
 
     puerto_nginx:
+      type: OS::Neutron::Port
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-puerto-nginx
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        network: { get_resource: net_privada }
+        fixed_ips:
+          - subnet: { get_resource: subnet_middleware }
+        security_groups:
+          - { get_resource: security_group_nginx }
 
-    security_group_mariadb:     # numero_puerto_mariadb
+    security_group_mariadb:
+      type: OS::Neutron::SecurityGroup
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-sg-mariadb
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        description: Reglas para MariaDB (acceso solo desde la subnet middleware)
+        rules:
+          - direction: ingress
+            protocol:  tcp
+            port_range_min: { get_param: numero_puerto_mariadb }
+            port_range_max: { get_param: numero_puerto_mariadb }
+            remote_ip_prefix: { get_param: cidr_subnet_middleware }
+          - direction: ingress
+            protocol:  icmp
+            remote_ip_prefix: { get_param: cidr_subnet_middleware }
+          - direction: ingress
+            protocol:  tcp
+            port_range_min: 22
+            port_range_max: 22
+            remote_ip_prefix: { get_param: cidr_subnet_middleware }
 
     puerto_mariadb:
+      type: OS::Neutron::Port
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-puerto-mariadb
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        network: { get_resource: net_privada }
+        fixed_ips:
+          - subnet:     { get_resource: subnet_backend }
+            ip_address: { get_param: ip_mariadb }
+        security_groups:
+          - { get_resource: security_group_mariadb }
 
     vm_nginx:
+      type: OS::Nova::Server
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-vm-nginx
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        image:    { get_param: imagen_nginx }
+        flavor:   { get_param: sabor_nginx }
+        key_name: { get_resource: clave_ssh }
+        networks:
+          - port: { get_resource: puerto_nginx }
+        # user_data: para imágenes reales (Ubuntu, Rocky...) aquí iría el cloud-init.
+        # Con CirrOS no aplica, pero la estructura sería:
+        #
+        # user_data_format: RAW
+        # user_data: |
+        #   #!/bin/bash
+        #   apt-get update && apt-get install -y nginx
+        #   systemctl enable --now nginx
+        #
+        # O con cloud-config:
+        # user_data_format: RAW
+        # user_data:
+        #   str_replace:
+        #     template: |
+        #       #cloud-config
+        #       packages: [nginx]
+        #       runcmd:
+        #         - systemctl enable --now nginx
+        #         - echo "IP MariaDB: IP_MARIADB" > /var/www/html/info.txt
+        #     params:
+        #       IP_MARIADB: { get_param: ip_mariadb }
 
     ip_flotante_nginx:
+      type: OS::Neutron::FloatingIP
+      properties:
+        floating_network: { get_param: red_externa }
+      depends_on:
+        - router_iface_middleware
+        - router_iface_backend
 
     asigancion_ip_flotante_nginx:
+      type: OS::Neutron::FloatingIPAssociation
+      properties:
+        floatingip_id: { get_resource: ip_flotante_nginx }
+        port_id:       { get_resource: puerto_nginx }
 
     vm_mariadb:
+      type: OS::Nova::Server
+      properties:
+        name:
+          str_replace:
+            template: PREFIJO-vm-mariadb
+            params:
+              PREFIJO: { get_param: prefijo_nombre_recursos }
+        image:    { get_param: imagen_mariadb }
+        flavor:   { get_param: sabor_mariadb }
+        key_name: { get_resource: clave_ssh }
+        networks:
+          - port: { get_resource: puerto_mariadb }
+        # CirrOS no tiene cloud-init completo pero sí ejecuta el script de user_data
+        # si user_data_format es RAW y empieza por #!/bin/sh.
+        # Lo usamos para configurar la IP estática ya que la subnet backend no tiene DHCP.
+        # Con una imagen real (Ubuntu, Rocky...) esto lo haría cloud-init de forma nativa.
+        #
+        # config_drive: true — Nova inyecta el user_data como volumen ISO montado localmente.
+        # Sin esto, CirrOS intentaría obtener el user_data via el metadata service (169.254.169.254),
+        # pero sin IP configurada (no hay DHCP) no puede llegar a él → el script nunca se ejecuta.
+        config_drive: true
+        user_data_format: RAW
+        user_data:
+          str_replace:
+            template: |
+              #!/bin/sh
+              PREFIX=$(echo "CIDR_BACKEND" | cut -d'/' -f2)
+              ip addr add IP_MARIADB/$PREFIX dev eth0
+              ip link set eth0 up
+              ip route add default via GW_BACKEND
+            params:
+              IP_MARIADB:   { get_param: ip_mariadb }
+              CIDR_BACKEND: { get_param: cidr_subnet_backend }
+              GW_BACKEND:   { get_param: gateway_subnet_backend }
 
 outputs:
 
     id_red_privada:
+      description: ID de la red privada interna
+      value: { get_resource: net_privada }
 
     id_subnet_middleware:
+      description: ID de la subnet del middleware (con DHCP, para NGINX)
+      value: { get_resource: subnet_middleware }
 
     id_subnet_backend:
+      description: ID de la subnet del backend (sin DHCP, para MariaDB)
+      value: { get_resource: subnet_backend }
 
     id_router:
+      description: ID del router
+      value: { get_resource: router }
 
     id_security_group_nginx:
+      description: ID del security group para NGINX
+      value: { get_resource: security_group_nginx }
 
     id_puerto_nginx:
+      description: ID del puerto de NGINX (IP dinámica en subnet middleware)
+      value: { get_resource: puerto_nginx }
 
     id_security_group_mariadb:
+      description: ID del security group para MariaDB
+      value: { get_resource: security_group_mariadb }
 
     id_puerto_mariadb:
+      description: ID del puerto de MariaDB (IP fija en subnet backend)
+      value: { get_resource: puerto_mariadb }
 
     id_vm_nginx:
+      description: ID de la VM NGINX
+      value: { get_resource: vm_nginx }
 
     ip_flotante_nginx:
+      description: ID del recurso floating IP de NGINX
+      value: { get_resource: ip_flotante_nginx }
 
     id_vm_mariadb:
+      description: ID de la VM MariaDB
+      value: { get_resource: vm_mariadb }
 
     ip_interna_vm_nginx:
+      description: IP privada de la VM NGINX (subnet middleware, asignada por DHCP)
+      value: { get_attr: [vm_nginx, first_address] }
 
     ip_interna_vm_mariadb:
+      description: IP privada de la VM MariaDB (subnet backend, IP fija)
+      value: { get_attr: [vm_mariadb, first_address] }
 
     ip_flotante_vm_nginx:
+      description: Floating IP de acceso público a la VM NGINX
+      value: { get_attr: [ip_flotante_nginx, floating_ip_address] }
 
     cidr_subnet_middleware:
+      description: CIDR de la subnet middleware
+      value: { get_param: cidr_subnet_middleware }
 
     cidr_subnet_backend:
+      description: CIDR de la subnet backend
+      value: { get_param: cidr_subnet_backend }
 
     numeros_puerto_nginx:
+      description: Puertos TCP abiertos en el security group de NGINX
+      value: { get_param: numeros_puerto_nginx }
 
     numero_puerto_mariadb:
+      description: Puerto TCP de MariaDB
+      value: { get_param: numero_puerto_mariadb }

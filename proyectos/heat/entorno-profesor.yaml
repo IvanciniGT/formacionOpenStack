@@ -1,0 +1,34 @@
+# Fichero de entorno Heat para la plantilla all-in-one (plantilla.yaml).
+#
+# Uso:
+#   openstack stack create -t plantilla.yaml \
+#     -e entorno-profesor.yaml \
+#     --parameter "clave_ssh_publica=$(cat ~/.ssh/id_rsa_heat.pub)" \
+#     heat-profesor --wait
+#
+# IMPORTANTE: clave_ssh_publica NO se incluye aquí por seguridad.
+#             Pásala siempre por --parameter en la línea de comandos.
+#             Nunca guardes claves privadas ni públicas en ficheros
+#             que vayas a versionar en un repositorio.
+
+parameter_defaults:
+
+  prefijo_nombre_recursos:  profesor
+
+  # Imagen: obtén el ID con:  openstack image list --name mi-cirros
+  imagen_nginx:             1ea06b64-f852-4125-b80f-c9417c1f38ea
+  imagen_mariadb:           1ea06b64-f852-4125-b80f-c9417c1f38ea
+
+  sabor_nginx:              m1.tiny
+  sabor_mariadb:            m1.tiny
+
+  red_externa:              external
+
+  # Valores de red (se pueden dejar con los defaults de la plantilla):
+  # cidr_subnet_middleware:   10.1.0.0/24
+  # gateway_subnet_middleware: 10.1.0.1
+  # cidr_subnet_backend:      10.2.0.0/24
+  # gateway_subnet_backend:   10.2.0.1
+  # ip_mariadb:               10.2.0.10
+  # numeros_puerto_nginx:     80,443
+  # numero_puerto_mariadb:    3306
